@@ -15,6 +15,7 @@ BASE_DIR = os.path.abspath(os.getenv('BASE_DIR', 'data'))
 # Folder of the .exe / project, where a custom finish sound (fertig.mp3 etc.) can be placed
 APP_DIR = os.path.abspath(os.getenv('APP_DIR', os.path.dirname(BASE_DIR)))
 SOUND_FILES = ['fertig.mp3', 'fertig.wav', 'fertig.ogg']
+CONFIG_DIR = os.getenv('CONFIG_DIR')
 TEMPLATE_DIR = os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))), 'templates')
 SVG_FILES = ['Filaments.svg', 'ActiveFilament.svg']
 
@@ -89,16 +90,20 @@ def get_status():
     })
 
 def find_sound_file():
-    for name in SOUND_FILES:
-        if os.path.exists(os.path.join(APP_DIR, name)):
-            return name
+    """Custom sound next to the .exe or in the settings folder."""
+    for directory in (APP_DIR, CONFIG_DIR):
+        if not directory:
+            continue
+        for name in SOUND_FILES:
+            if os.path.exists(os.path.join(directory, name)):
+                return directory, name
     return None
 
 @app.route('/sound')
 def get_sound():
     sound_file = find_sound_file()
     if sound_file:
-        return send_from_directory(APP_DIR, sound_file)
+        return send_from_directory(*sound_file)
     return "No sound", 404
 
 @app.route('/cover')

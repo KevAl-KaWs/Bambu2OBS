@@ -1,4 +1,4 @@
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 import os
 import ssl
 from pybambu import BambuClient
@@ -14,41 +14,87 @@ import signal
 import sys
 import xml.etree.ElementTree as ET
 import threading
+import shutil
 import ftplib
 import io
 import re
 import zipfile
 
-# As .exe (PyInstaller) the config and data live next to the .exe, otherwise in the project folder
+# As .exe (PyInstaller) the data lives next to the .exe, otherwise in the project folder
 if getattr(sys, 'frozen', False):
     APP_DIR = os.path.dirname(sys.executable)
     TEMPLATE_DIR = os.path.join(sys._MEIPASS, 'templates')
 else:
     APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
-ENV_PATH = os.path.join(APP_DIR, '.env')
 
-def run_first_setup():
-    """Asks for the printer details on first start and writes the .env file."""
+# Settings are kept in a fixed user folder, so a new version in any folder finds them again
+if os.name == 'nt' and os.getenv('APPDATA'):
+    CONFIG_DIR = os.path.join(os.getenv('APPDATA'), 'Bambu2OBS')
+else:
+    CONFIG_DIR = os.path.join(os.path.expanduser('~'), '.config', 'Bambu2OBS')
+CONFIG_PATH = os.path.join(CONFIG_DIR, 'config.env')
+LOCAL_ENV_PATH = os.path.join(APP_DIR, '.env')
+
+if not getattr(sys, 'frozen', False) and os.path.exists(LOCAL_ENV_PATH):
+    # Running from source with a project .env (original setup)
+    ENV_PATH = LOCAL_ENV_PATH
+else:
+    ENV_PATH = CONFIG_PATH
+    # Take over a .env from an older version next to the .exe
+    if not os.path.exists(CONFIG_PATH) and os.path.exists(LOCAL_ENV_PATH):
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        shutil.copyfile(LOCAL_ENV_PATH, CONFIG_PATH)
+
+def ask(question, current=None, secret=False):
+    """Asks for a value; Enter keeps the current one."""
+    if current:
+        hint = 'gespeichert' if secret else current
+        answer = input(f"{question} [{hint}]: ").strip()
+        return answer or current
+    return input(f"{question}: ").strip()
+
+def run_setup():
+    """Asks for the printer details and writes the settings file."""
+    current = dotenv_values(ENV_PATH) if os.path.exists(ENV_PATH) else {}
     print("=" * 60)
-    print(" Bambu2OBS - Ersteinrichtung")
+    print(" Bambu2OBS - Einstellungen")
     print(" Die Angaben findest du am Drucker unter Einstellungen -> WLAN/Netzwerk.")
+    if current:
+        print(" Enter drücken übernimmt den Wert in [Klammern].")
     print("=" * 60)
-    printer_ip = input("IP-Adresse des Druckers (z. B. 192.168.178.45): ").strip()
-    access_code = input("Access Code des Druckers: ").strip()
-    printer_sn = input("Seriennummer des Druckers: ").strip()
-    print("Optional: Bambu-Konto fuer Modellname und Vorschaubild (leer lassen = ohne).")
-    email = input("Bambu-Konto E-Mail: ").strip()
-    password = input("Bambu-Konto Passwort: ").strip() if email else ''
+    printer_ip = ask("IP-Adresse des Druckers (z. B. 192.168.178.45)", current.get('PRINTER_IP'))
+    access_code = ask("Access Code des Druckers", current.get('ACCESS_CODE'))
+    printer_sn = ask("Seriennummer des Druckers", current.get('PRINTER_SN'))
+    print("Optional: Bambu-Konto für den Modellnamen von MakerWorld (leer lassen = ohne).")
+    email = ask("Bambu-Konto E-Mail", current.get('EMAIL'))
+    password = ask("Bambu-Konto Passwort", current.get('PASSWORD'), secret=True) if email else ''
+    os.makedirs(os.path.dirname(ENV_PATH), exist_ok=True)
     with open(ENV_PATH, 'w', encoding='utf-8') as env_file:
         env_file.write(
             f"EMAIL={email}\nPASSWORD={password}\nREGION=global\n"
             f"PRINTER_SN={printer_sn}\nPRINTER_IP={printer_ip}\nACCESS_CODE={access_code}\nBASE_DIR=data\n"
         )
-    print(f"Gespeichert in {ENV_PATH} - zum Aendern diese Datei loeschen und neu starten.\n")
+    print(f"Einstellungen gespeichert in {ENV_PATH}\n")
 
-if __name__ == '__main__' and not os.path.exists(ENV_PATH):
-    run_first_setup()
+def offer_settings_change(seconds=5):
+    """On Windows: pressing E right after the start opens the settings again."""
+    try:
+        import msvcrt
+    except ImportError:
+        return False
+    print(f"Einstellungen ändern? Innerhalb von {seconds} Sekunden die Taste E drücken ...")
+    end = time.time() + seconds
+    while time.time() < end:
+        if msvcrt.kbhit() and msvcrt.getwch().lower() == 'e':
+            return True
+        time.sleep(0.05)
+    print("Starte mit den gespeicherten Einstellungen.\n")
+    return False
+
+if __name__ == '__main__':
+    if not os.path.exists(ENV_PATH) or offer_settings_change():
+        run_setup()
 
 # Load environment variables
 load_dotenv(ENV_PATH)
@@ -87,6 +133,7 @@ BASE_DIR = os.path.join(APP_DIR, os.getenv('BASE_DIR') or 'data')
 # progressbarServer reads BASE_DIR from the environment, so hand over the absolute path
 os.environ['BASE_DIR'] = BASE_DIR
 os.environ['APP_DIR'] = APP_DIR
+os.environ['CONFIG_DIR'] = CONFIG_DIR
 DUMPS_FILE_PATH = os.path.join(BASE_DIR, 'ConnectionDumps.json')
 DUMP_MESSAGES = os.getenv('DUMP_MESSAGES', '0') == '1'
 
