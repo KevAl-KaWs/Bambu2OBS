@@ -1,5 +1,7 @@
 # Bambu2OBS
 
+🇩🇪 **Deutsche Anleitung für das Druck-Overlay (Name, pinker Fortschrittsbalken, Restzeit): [ANLEITUNG.md](ANLEITUNG.md)**
+
 ## Overview
 Bambu2OBS is a tool that connects your Bambu Lab 3D printer to OBS Studio, allowing you to monitor and display real-time print progress directly in OBS. Ideal for content creators who want to showcase live 3D printing projects or create timelapses with accurate status updates.
 
@@ -80,7 +82,9 @@ In order to connect to your Bambu printer, set the following environment variabl
     python .\src\bambu2obs.py
     ```
 
-2. Configure OBS Studio to display the progress bar and SVGs by adding browser sources pointing to the Flask server's URLs.
+2. Add a browser source in OBS with the URL `http://localhost:5000/view/overlay` (600 × 130) for the all-in-one overlay (print name, pink progress bar, remaining time). Optional URL parameters: `color=ff4fa3`, `card=0`, `cover=0`.
+
+3. Configure OBS Studio to display the progress bar and SVGs by adding browser sources pointing to the Flask server's URLs.
 
 ### Importing the OBS Scene
 

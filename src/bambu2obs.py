@@ -25,8 +25,10 @@ subprocesses = []  # List to keep track of subprocesses
 def launch_progress_server():
     """Launches the progress bar server as a separate process."""
     # Use the current Python interpreter to run progressbarServer.py
-    proc = subprocess.Popen([sys.executable, 'src/progressbarServer.py'])
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    proc = subprocess.Popen([sys.executable, os.path.join(script_dir, 'progressbarServer.py')])
     subprocesses.append(proc)
+    return proc
 
 def cleanup_subprocesses():
     """Terminates all running subprocesses initiated by this script."""
@@ -35,7 +37,7 @@ def cleanup_subprocesses():
         proc.wait()       # Wait for the subprocess to exit
 
 # Define the path for the ConnectionDumps.json file in the data subdirectory
-DUMPS_FILE_PATH = os.path.join('data', 'ConnectionDumps.json')
+DUMPS_FILE_PATH = os.path.join(os.getenv('BASE_DIR', 'data'), 'ConnectionDumps.json')
 
 # Retrieve environment variables
 REGION = os.getenv('REGION')
@@ -45,7 +47,8 @@ USERNAME = os.getenv('USERNAME')
 PRINTER_SN = os.getenv('PRINTER_SN')
 PRINTER_IP = os.getenv('PRINTER_IP')
 ACCESS_CODE = os.getenv('ACCESS_CODE')
-BASE_DIR = os.getenv('BASE_DIR')
+BASE_DIR = os.getenv('BASE_DIR', 'data')
+DUMP_MESSAGES = os.getenv('DUMP_MESSAGES', '0') == '1'
 
 total_layer_num_global = None
 
@@ -274,6 +277,17 @@ def update_svg_with_all_tray_colors():
 # Load the persisted total_layer_num at script startup
 total_layer_num_global = load_from_file("total_layer_num", None)
 
+def try_process_latest_task(force_update=False):
+    """Fetches title/cover from Bambu Cloud. Optional: the overlay also works without cloud access."""
+    if not EMAIL or not PASSWORD or EMAIL == 'your_email@domain.com':
+        return
+    try:
+        bambu_cloud = BambuCloud(REGION, EMAIL, PASSWORD)
+        bambu_cloud.login()
+        process_latest_task(bambu_cloud, PRINTER_SN, BASE_DIR, force_update=force_update)
+    except Exception as e:
+        print(f"Bambu Cloud not available, continuing without cover/title: {e}")
+
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
     client.subscribe(f"device/{PRINTER_SN}/report")
@@ -290,9 +304,11 @@ def on_message(client, userdata, msg):
         # Convert numeric values to strings where necessary
         message_data_str = convert_all_to_str(message_data)
 
-        with open(DUMPS_FILE_PATH, 'a') as dumps_file:
-            json.dump({"timestamp": datetime.now().isoformat(), "message": message_data_str}, dumps_file, indent=4)
-            dumps_file.write('\n')
+        # Raw message log grows quickly, so it is only written when DUMP_MESSAGES=1
+        if DUMP_MESSAGES:
+            with open(DUMPS_FILE_PATH, 'a') as dumps_file:
+                json.dump({"timestamp": datetime.now().isoformat(), "message": message_data_str}, dumps_file, indent=4)
+                dumps_file.write('\n')
 
         if 'print' in message_data_str:
             handle_print_data(message_data_str['print'])
@@ -302,10 +318,14 @@ def on_message(client, userdata, msg):
             if current_task_id and current_task_id != previous_task_id:
                 print("New print job detected. Rerunning Bambu Cloud connection for the latest task.")
                 previous_task_id = current_task_id  # Update the last known task ID
+                # Drop title/cover of the previous print so the overlay never shows stale data
+                for stale_file in ('designTitle.txt', 'printCover.png'):
+                    try:
+                        os.remove(os.path.join(BASE_DIR, stale_file))
+                    except FileNotFoundError:
+                        pass
                 # Reconnect to Bambu Cloud to fetch the latest task information
-                bambu_cloud = BambuCloud(REGION, EMAIL, PASSWORD)
-                bambu_cloud.login()
-                process_latest_task(bambu_cloud, PRINTER_SN, BASE_DIR)
+                try_process_latest_task(force_update=True)
     except Exception as e:
         print(f"Error processing message: {e}")
 
@@ -324,6 +344,10 @@ def handle_print_data(print_data):
     # Process print profile name
     if 'subtask_name' in print_data:
         write_to_file('printProfile', print_data['subtask_name'])
+        write_to_file('printName', print_data['subtask_name'])
+
+    if 'gcode_state' in print_data:
+        write_to_file('printState', print_data['gcode_state'])
 
     # Process print progress
     if 'mc_percent' in print_data:
@@ -333,6 +357,7 @@ def handle_print_data(print_data):
     if 'mc_remaining_time' in print_data:
         formatted_time = format_remaining_time(int(print_data['mc_remaining_time']))
         write_to_file('remaining_time', formatted_time)
+        write_to_file('remaining_minutes', str(int(print_data['mc_remaining_time'])))
 
     # Process cooling fan speed
     if 'cooling_fan_speed' in print_data:
@@ -407,6 +432,9 @@ def format_time_hms(seconds):
 def process_latest_task(bambu_cloud, printer_sn, base_dir, force_update=False):
     global is_first_run
     latest_task = bambu_cloud.get_latest_task_for_printer(printer_sn)
+    if not latest_task:
+        print("No cloud task found for this printer.")
+        return
     task_id_file_path = os.path.join(base_dir, 'latest_task_id.txt')
 
     # Read the last processed task ID if exists
@@ -471,22 +499,14 @@ def main():
     Main function to initialize Bambu Cloud connection, start progress bar server,
     and handle MQTT messages for Bambu 3D printer status updates.
     """
-    print("Initializing Bambu Cloud connection...")
-    bambu_cloud = BambuCloud(REGION, EMAIL, PASSWORD)
-    bambu_cloud.login()
-    print("Bambu Cloud connection initialized.")
-    
-    # Process the latest task from Bambu Cloud, forcing update on the first run
-    process_latest_task(bambu_cloud, PRINTER_SN, BASE_DIR, force_update=is_first_run)
+    # Process the latest task from Bambu Cloud (optional), forcing update on the first run
+    try_process_latest_task(force_update=is_first_run)
 
-    server_proc = launch_progress_server()
+    launch_progress_server()
     print("Progress bar server started.")
+    print("OBS overlay: http://localhost:5000/view/overlay")
 
     try:
-        # Process the latest task from Bambu Cloud, if any
-        process_latest_task(bambu_cloud, PRINTER_SN, BASE_DIR)
-        print("Latest task processed.")
-
         # Setup and start MQTT listener for real-time printer status updates
         print("Connecting to the printer's local MQTT service...")
         mqtt_client = setup_mqtt_listener()
@@ -496,7 +516,7 @@ def main():
     except Exception as e:
         print(f"Unhandled exception: {e}")
     finally:
-        stop_progressbar_server(server_proc)
+        cleanup_subprocesses()
         print("Progress bar server stopped.")
 
 if __name__ == "__main__":

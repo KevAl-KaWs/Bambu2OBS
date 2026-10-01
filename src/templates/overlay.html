@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Bambu2OBS Overlay</title>
+    <style>
+        :root {
+            --bar: #ff4fa3;
+            --bar-light: #ff9ad0;
+            --track: rgba(255, 255, 255, 0.15);
+            --card: rgba(20, 20, 28, 0.78);
+            --text: #ffffff;
+            --muted: rgba(255, 255, 255, 0.7);
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+            color: var(--text);
+        }
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-sizing: border-box;
+            width: 100vw;
+            padding: 14px 18px;
+            border-radius: 16px;
+            background: var(--card);
+        }
+        body.no-card .card { background: transparent; padding: 0; }
+        .cover {
+            flex: 0 0 auto;
+            width: 72px;
+            height: 72px;
+            border-radius: 10px;
+            object-fit: cover;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .cover[hidden] { display: none; }
+        .info { flex: 1 1 auto; min-width: 0; }
+        .label {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        .name {
+            font-size: 22px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 2px 0 10px;
+        }
+        .track {
+            height: 18px;
+            border-radius: 9px;
+            background: var(--track);
+            overflow: hidden;
+        }
+        .bar {
+            height: 100%;
+            width: 0%;
+            border-radius: 9px;
+            background: linear-gradient(90deg, var(--bar), var(--bar-light));
+            box-shadow: 0 0 12px var(--bar);
+            transition: width 0.8s ease;
+        }
+        .meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 8px;
+            font-size: 16px;
+            font-variant-numeric: tabular-nums;
+        }
+        .percent { font-weight: 700; color: var(--bar-light); }
+        .time { color: var(--muted); text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img class="cover" id="cover" alt="" hidden>
+        <div class="info">
+            <div class="label" id="label">Druckt gerade</div>
+            <div class="name" id="name">–</div>
+            <div class="track"><div class="bar" id="bar"></div></div>
+            <div class="meta">
+                <span class="percent" id="percent">0 %</span>
+                <span class="time" id="time"></span>
+            </div>
+        </div>
+    </div>
+    <script src="/view/overlay.js"></script>
+</body>
+</html>

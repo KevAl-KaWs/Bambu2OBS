@@ -52,6 +52,50 @@ def get_progress():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def read_data(name, default=None):
+    try:
+        with open(os.path.join(BASE_DIR, f'{name}.txt'), 'r', encoding='utf-8') as file:
+            return file.read().strip()
+    except (FileNotFoundError, OSError):
+        return default
+
+def to_number(value, default=None):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+@app.route('/status')
+def get_status():
+    """All values the overlay needs in one request."""
+    cover_path = os.path.join(BASE_DIR, 'printCover.png')
+    design_title = read_data('designTitle')
+    return jsonify({
+        'name': read_data('printName') or read_data('printProfile'),
+        'designTitle': design_title if design_title not in (None, 'N/A') else None,
+        'progress': to_number(read_data('progress'), 0),
+        'remainingMinutes': to_number(read_data('remaining_minutes')),
+        'state': read_data('printState'),
+        'layer': read_data('layer_num'),
+        'totalLayers': read_data('total_layer_num'),
+        'hasCover': os.path.exists(cover_path),
+        'coverVersion': int(os.path.getmtime(cover_path)) if os.path.exists(cover_path) else 0,
+    })
+
+@app.route('/cover')
+def get_cover():
+    if os.path.exists(os.path.join(BASE_DIR, 'printCover.png')):
+        return send_from_directory(BASE_DIR, 'printCover.png')
+    return "No cover", 404
+
+@app.route('/view/overlay')
+def overlay_view():
+    return send_from_directory(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'), 'overlay.html')
+
+@app.route('/view/overlay.js')
+def overlay_script():
+    return send_from_directory(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'), 'overlay.js')
+
 @app.route('/view/progressbar')
 def progressbar_view():
     html = """
