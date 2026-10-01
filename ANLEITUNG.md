@@ -28,7 +28,7 @@ Python oder sonstige Programme brauchst du **nicht**.
 
    - **IP-Adresse** und **Access Code**
    - **Seriennummer**
-   - **E-Mail / Passwort** des Bambu-Kontos: **optional**, einfach mit Enter überspringen. Mit Bambu-Konto werden Modellname und Vorschaubild angezeigt, ohne Konto der Dateiname des Drucks.
+   - **E-Mail / Passwort** des Bambu-Kontos: **optional**, einfach mit Enter überspringen. Mit Bambu-Konto wird der Modellname von MakerWorld angezeigt, ohne Konto der Dateiname des Drucks.
 
    Wo du IP-Adresse, Access Code und Seriennummer findest, steht im nächsten Abschnitt.
 
@@ -94,4 +94,5 @@ Mehrere kombinieren mit `&`, z. B. `http://localhost:5000/view/overlay?color=c02
 
 - **Overlay bleibt leer / zeigt „–“:** Läuft das schwarze Fenster von Bambu2OBS noch? Startet gerade ein Druck? Die Daten kommen erst, sobald der Drucker welche sendet.
 - **Keine Verbindung zum Drucker:** IP-Adresse und Access Code nochmal prüfen (`.env` löschen und neu starten). Bei neueren Firmware-Versionen muss am Drucker eventuell der **LAN-Modus** bzw. **Entwicklermodus** aktiviert werden, damit externe Programme mitlesen dürfen.
+- **Kein Vorschaubild:** Das Bild wird bei jedem neuen Druck von der **SD-Karte im Drucker** geholt. Ohne SD-Karte geht das nicht. Bei einem Druck, der schon lief, bevor Bambu2OBS gestartet wurde, kann es ein paar Sekunden dauern.
 - **Overlay ging, nach ein paar Tagen aber nicht mehr:** Der Router hat dem Drucker vermutlich eine neue IP-Adresse gegeben. Im Router eine feste Adresse einstellen (FritzBox: **Heimnetz → Netzwerk** → beim Drucker auf den Stift klicken → **„Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“**). Danach die `.env` neben der .exe löschen und die .exe neu starten.

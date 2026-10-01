@@ -14,6 +14,10 @@ import signal
 import sys
 import xml.etree.ElementTree as ET
 import threading
+import ftplib
+import io
+import re
+import zipfile
 
 # As .exe (PyInstaller) the config and data live next to the .exe, otherwise in the project folder
 if getattr(sys, 'frozen', False):
@@ -311,25 +315,108 @@ def update_svg_with_all_tray_colors():
 # Load the persisted total_layer_num at script startup
 total_layer_num_global = load_from_file("total_layer_num", None)
 
-def try_process_latest_task(force_update=False):
+def try_process_latest_task(force_update=False, expected_task_id=None):
     """Fetches title/cover from Bambu Cloud. Optional: the overlay also works without cloud access."""
     if not EMAIL or not PASSWORD or EMAIL == 'your_email@domain.com':
         return
     try:
         bambu_cloud = BambuCloud(REGION, EMAIL, PASSWORD)
         bambu_cloud.login()
-        process_latest_task(bambu_cloud, PRINTER_SN, BASE_DIR, force_update=force_update)
+        process_latest_task(bambu_cloud, PRINTER_SN, BASE_DIR, force_update=force_update, expected_task_id=expected_task_id)
     except Exception as e:
         print(f"Bambu Cloud not available, continuing without cover/title: {e}")
+
+class ImplicitFTP_TLS(ftplib.FTP_TLS):
+    """FTP over implicit TLS (port 990), as used by the printer for its SD card."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sock = None
+
+    @property
+    def sock(self):
+        return self._sock
+
+    @sock.setter
+    def sock(self, value):
+        if value is not None and not isinstance(value, ssl.SSLSocket):
+            value = self.context.wrap_socket(value)
+        self._sock = value
+
+    def ntransfercmd(self, cmd, rest=None):
+        conn, size = ftplib.FTP.ntransfercmd(self, cmd, rest)
+        if self._prot_p:
+            # The printer requires the data connection to reuse the TLS session
+            conn = self.context.wrap_socket(conn, server_hostname=self.host, session=self.sock.session)
+        return conn, size
+
+def find_print_file(ftp, print_name, gcode_file):
+    """Finds the .3mf of the current print on the SD card."""
+    if gcode_file and gcode_file.lower().endswith('.3mf'):
+        yield gcode_file
+    for directory in ('/', '/cache'):
+        try:
+            entries = ftp.nlst(directory)
+        except ftplib.all_errors:
+            continue
+        for entry in entries:
+            file_name = entry.rsplit('/', 1)[-1]
+            if file_name.lower().endswith('.3mf') and file_name.startswith(print_name):
+                yield f"{directory.rstrip('/')}/{file_name}"
+
+def extract_plate_image(threemf_bytes, gcode_file):
+    """Returns the slicer preview of the printed plate from a .3mf file."""
+    plate_match = re.search(r'plate_(\d+)', gcode_file or '')
+    plate = plate_match.group(1) if plate_match else '1'
+    with zipfile.ZipFile(io.BytesIO(threemf_bytes)) as archive:
+        names = archive.namelist()
+        for candidate in (f'Metadata/plate_{plate}.png', 'Metadata/plate_1.png'):
+            if candidate in names:
+                return archive.read(candidate)
+        previews = sorted(n for n in names if re.fullmatch(r'Metadata/plate_\d+\.png', n))
+        return archive.read(previews[0]) if previews else None
+
+def fetch_cover_from_printer(print_name, gcode_file):
+    """Loads the preview image from the printer's SD card (works without Bambu Cloud)."""
+    try:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        ftp = ImplicitFTP_TLS(context=context)
+        ftp.connect(PRINTER_IP, 990, timeout=20)
+        ftp.login('bblp', ACCESS_CODE)
+        ftp.prot_p()
+        try:
+            for path in find_print_file(ftp, print_name, gcode_file):
+                buffer = io.BytesIO()
+                try:
+                    ftp.retrbinary(f'RETR {path}', buffer.write)
+                except ftplib.all_errors:
+                    continue
+                image = extract_plate_image(buffer.getvalue(), gcode_file)
+                if image:
+                    with open(os.path.join(BASE_DIR, 'printCover.png'), 'wb') as cover_file:
+                        cover_file.write(image)
+                    print(f"Preview image loaded from printer: {path}")
+                    return
+            print("No preview image found on the printer's SD card.")
+        finally:
+            ftp.quit()
+    except Exception as e:
+        print(f"Could not load preview image from printer: {e}")
 
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
     client.subscribe(f"device/{PRINTER_SN}/report")
+    # P1/A1 only send changes, so ask once for the full status (print name etc.)
+    client.publish(f"device/{PRINTER_SN}/request", json.dumps({"pushing": {"sequence_id": "0", "command": "pushall"}}))
 
-previous_task_id = None  # Global variable to store the ID of the last known print task
+# Last known print job, assembled from the (partial) MQTT messages
+current_job = {'task_id': None, 'name': None, 'gcode_file': None}
+previous_job_key = None
 
 def on_message(client, userdata, msg):
-    global total_layer_num_global, previous_task_id
+    global total_layer_num_global, previous_job_key
     print(" ")
     print(f"Message received -> Topic: {msg.topic} Message: {msg.payload.decode('utf-8')}")
     try:
@@ -347,19 +434,30 @@ def on_message(client, userdata, msg):
         if 'print' in message_data_str:
             handle_print_data(message_data_str['print'])
 
-            # Check if a new print job is detected
-            current_task_id = message_data_str['print'].get('task_id')  # Assume the message contains a task ID
-            if current_task_id and current_task_id != previous_task_id:
-                print("New print job detected. Rerunning Bambu Cloud connection for the latest task.")
-                previous_task_id = current_task_id  # Update the last known task ID
+            print_data = message_data_str['print']
+            for key, field in (('task_id', 'task_id'), ('name', 'subtask_name'), ('gcode_file', 'gcode_file')):
+                if print_data.get(field):
+                    current_job[key] = print_data[field]
+
+            # A new print job is detected by task ID + name (LAN prints always have task ID 0)
+            job_key = (current_job['task_id'], current_job['name'])
+            if current_job['name'] and job_key != previous_job_key:
+                print("New print job detected. Fetching title and preview image.")
+                previous_job_key = job_key
                 # Drop title/cover of the previous print so the overlay never shows stale data
                 for stale_file in ('designTitle.txt', 'printCover.png'):
                     try:
                         os.remove(os.path.join(BASE_DIR, stale_file))
                     except FileNotFoundError:
                         pass
-                # Reconnect to Bambu Cloud to fetch the latest task information
-                try_process_latest_task(force_update=True)
+                try_process_latest_task(force_update=True, expected_task_id=current_job['task_id'])
+                # Without cloud data the preview comes straight from the printer's SD card
+                if not os.path.exists(os.path.join(BASE_DIR, 'printCover.png')):
+                    threading.Thread(
+                        target=fetch_cover_from_printer,
+                        args=(current_job['name'], current_job['gcode_file']),
+                        daemon=True,
+                    ).start()
     except Exception as e:
         print(f"Error processing message: {e}")
 
@@ -463,11 +561,15 @@ def format_time_hms(seconds):
     return f"{hours}h {minutes}m {seconds}s"
 
 
-def process_latest_task(bambu_cloud, printer_sn, base_dir, force_update=False):
+def process_latest_task(bambu_cloud, printer_sn, base_dir, force_update=False, expected_task_id=None):
     global is_first_run
     latest_task = bambu_cloud.get_latest_task_for_printer(printer_sn)
     if not latest_task:
         print("No cloud task found for this printer.")
+        return
+    # Only use cloud data that belongs to the running print (not for LAN prints or older jobs)
+    if expected_task_id is not None and str(latest_task.get('id')) != str(expected_task_id):
+        print("Latest cloud task does not match the running print. Skipping cloud data.")
         return
     task_id_file_path = os.path.join(base_dir, 'latest_task_id.txt')
 
