@@ -27,6 +27,21 @@ jobs:
       - name: Build exe
         run: pyinstaller --onefile --name Bambu2OBS --paths src --hidden-import progressbarServer --add-data "src/templates;templates" src/bambu2obs.py
 
+      - name: Smoke test exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path smoke | Out-Null
+          Copy-Item dist/Bambu2OBS.exe smoke/
+          "PRINTER_IP=192.0.2.1`nACCESS_CODE=x`nPRINTER_SN=x`nBASE_DIR=data" | Set-Content smoke/.env
+          $proc = Start-Process -FilePath smoke/Bambu2OBS.exe -WorkingDirectory smoke -PassThru
+          Start-Sleep -Seconds 15
+          $status = Invoke-WebRequest -UseBasicParsing http://localhost:5000/status
+          $overlay = Invoke-WebRequest -UseBasicParsing http://localhost:5000/view/overlay
+          $script = Invoke-WebRequest -UseBasicParsing http://localhost:5000/view/overlay.js
+          Write-Host $status.Content
+          Stop-Process -Id $proc.Id -Force
+          if ($overlay.StatusCode -ne 200 -or $script.StatusCode -ne 200) { exit 1 }
+
       - name: Package
         shell: pwsh
         run: |
