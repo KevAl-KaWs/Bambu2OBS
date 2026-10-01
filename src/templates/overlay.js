@@ -1,4 +1,4 @@
-// URL options, e.g. /view/overlay?color=ff4fa3&cover=0&card=0
+// URL options, e.g. /view/overlay?name=Printcess&color=ff4fa3&cover=0&card=0
 const params = new URLSearchParams(window.location.search);
 
 if (params.get('color')) {
@@ -10,6 +10,17 @@ if (params.get('card') === '0') {
     document.body.classList.add('no-card');
 }
 const showCover = params.get('cover') !== '0';
+
+const printerName = (params.get('name') || '').trim();
+
+const NAMED_STATE_LABELS = {
+    RUNNING: 'druckt gerade',
+    PREPARE: 'bereitet den Druck vor',
+    PAUSE: 'macht Pause',
+    FINISH: 'ist fertig!',
+    FAILED: 'hat abgebrochen',
+    IDLE: 'ruht sich aus',
+};
 
 const STATE_LABELS = {
     RUNNING: 'Druckt gerade',
@@ -42,7 +53,9 @@ async function update() {
         document.getElementById('bar').style.width = `${progress}%`;
         document.getElementById('percent').textContent = `${Math.round(progress)} %`;
         document.getElementById('name').textContent = data.designTitle || data.name || '–';
-        document.getElementById('label').textContent = STATE_LABELS[data.state] || 'Druckt gerade';
+        document.getElementById('label').textContent = printerName
+            ? `${printerName} ${NAMED_STATE_LABELS[data.state] || NAMED_STATE_LABELS.RUNNING}`
+            : (STATE_LABELS[data.state] || STATE_LABELS.RUNNING);
 
         const time = document.getElementById('time');
         if (data.state === 'FINISH') {

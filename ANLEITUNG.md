@@ -18,7 +18,7 @@ Python oder sonstige Programme brauchst du **nicht**.
 ## 2. Herunterladen
 
 1. Rechts auf dieser GitHub-Seite unter **„Releases“** die neueste Version öffnen.
-2. **`Bambu2OBS-Windows.zip`** herunterladen und in einen eigenen Ordner entpacken, z. B. `C:\Bambu2OBS`.
+2. **`Bambu2OBS-Windows-….zip`** herunterladen und in einen eigenen Ordner entpacken, z. B. `C:\Bambu2OBS`.
 
 ## 3. Erster Start
 
@@ -84,13 +84,26 @@ Einfach an die URL anhängen:
 
 | Zusatz | Wirkung |
 |---|---|
+| `?name=Printcess` | Name des Druckers, dann steht da z. B. „Printcess druckt gerade“ oder „Printcess ist fertig!“ |
 | `?color=ff4fa3` | Farbe des Balkens (Hex-Farbcode ohne `#`), Standard ist Pink |
 | `?card=0` | Ohne dunklen Hintergrund-Kasten |
 | `?cover=0` | Ohne Vorschaubild |
 
-Mehrere kombinieren mit `&`, z. B. `http://localhost:5000/view/overlay?color=c026d3&card=0`
+Mehrere kombinieren mit `&`, z. B. `http://localhost:5000/view/overlay?name=Printcess&color=c026d3`
 
-## 7. Wenn etwas nicht klappt
+Die URL änderst du in OBS mit einem Doppelklick auf die Browserquelle.
+
+## 7. Auf eine neue Version updaten
+
+1. Bambu2OBS schließen (das schwarze Fenster).
+2. Unter **„Releases“** auf dieser GitHub-Seite die neueste `Bambu2OBS-Windows-….zip` herunterladen.
+3. Aus der ZIP nur die **`Bambu2OBS.exe`** in deinen Ordner (z. B. `C:\Bambu2OBS`) kopieren und die alte ersetzen.
+4. Die **`.env`** im Ordner **nicht löschen**, darin stehen deine Drucker-Daten. Dann musst du nichts neu eingeben.
+5. Bambu2OBS wieder starten. Falls das Overlay in OBS noch alt aussieht: Browserquelle anklicken → **„Seite aktualisieren“** bzw. in den Eigenschaften „Cache der aktuellen Seite aktualisieren“.
+
+Die Versionsnummer steht im Namen der ZIP-Datei, z. B. `Bambu2OBS-Windows-v1.2.0.zip`. Ist die Nummer auf GitHub höher als bei deiner Datei, gibt es etwas Neues.
+
+## 8. Wenn etwas nicht klappt
 
 - **Overlay bleibt leer / zeigt „–“:** Läuft das schwarze Fenster von Bambu2OBS noch? Startet gerade ein Druck? Die Daten kommen erst, sobald der Drucker welche sendet.
 - **Keine Verbindung zum Drucker:** IP-Adresse und Access Code nochmal prüfen (`.env` löschen und neu starten). Bei neueren Firmware-Versionen muss am Drucker eventuell der **LAN-Modus** bzw. **Entwicklermodus** aktiviert werden, damit externe Programme mitlesen dürfen.

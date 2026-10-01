@@ -48,15 +48,15 @@ jobs:
           New-Item -ItemType Directory -Path release | Out-Null
           Copy-Item dist/Bambu2OBS.exe release/
           Copy-Item ANLEITUNG.md release/ANLEITUNG.txt
-          Compress-Archive -Path release/* -DestinationPath Bambu2OBS-Windows.zip
+          Compress-Archive -Path release/* -DestinationPath Bambu2OBS-Windows-${{ github.ref_name }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: Bambu2OBS-Windows
-          path: Bambu2OBS-Windows.zip
+          path: Bambu2OBS-Windows-${{ github.ref_name }}.zip
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: Bambu2OBS-Windows.zip
+          files: Bambu2OBS-Windows-${{ github.ref_name }}.zip
