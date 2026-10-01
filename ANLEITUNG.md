@@ -26,14 +26,31 @@ Python oder sonstige Programme brauchst du **nicht**.
    Falls Windows „Der Computer wurde durch Windows geschützt“ anzeigt: auf **„Weitere Informationen“** → **„Trotzdem ausführen“** klicken. (Das kommt bei kleinen Programmen ohne gekaufte Signatur.)
 2. Im schwarzen Fenster wirst du einmalig nach diesen Angaben gefragt:
 
-   | Frage | Wo finde ich das? |
-   |---|---|
-   | IP-Adresse | Am Drucker-Display unter **Einstellungen → WLAN/Netzwerk** (z. B. `192.168.178.45`) |
-   | Access Code | Ebenfalls unter **Einstellungen → WLAN/Netzwerk** („Access Code“ / „Zugangscode“) |
-   | Seriennummer | Am Drucker unter **Einstellungen → Gerät**, oder in Bambu Studio / Bambu Handy |
-   | E-Mail / Passwort | **Optional**, einfach mit Enter überspringen. Mit Bambu-Konto werden Modellname und Vorschaubild angezeigt, ohne Konto der Dateiname des Drucks. |
+   - **IP-Adresse** und **Access Code**
+   - **Seriennummer**
+   - **E-Mail / Passwort** des Bambu-Kontos: **optional**, einfach mit Enter überspringen. Mit Bambu-Konto werden Modellname und Vorschaubild angezeigt, ohne Konto der Dateiname des Drucks.
+
+   Wo du IP-Adresse, Access Code und Seriennummer findest, steht im nächsten Abschnitt.
 
    Die Angaben werden in der Datei `.env` neben der .exe gespeichert. Zum Ändern diese Datei löschen und die .exe neu starten.
+
+### Wo finde ich IP-Adresse, Access Code und Seriennummer?
+
+Die Menünamen können je nach Modell und Firmware leicht abweichen.
+
+**IP-Adresse und Access Code** stehen direkt am Drucker-Display:
+
+- **A1 / A1 mini / P1S / P1P:** Zahnrad (Einstellungen) → **WLAN**. Dort stehen die IP-Adresse (z. B. `192.168.178.45`) und der **Access Code** (8 Zeichen aus Zahlen und Buchstaben).
+- **X1 / X1C:** Zahnrad → Reiter **Netzwerk**. Dort stehen dieselben Angaben.
+
+Den Access Code am besten direkt beim ersten Start vom Display ablesen. Er kann sich ändern, z. B. nachdem der Drucker zurückgesetzt wurde.
+
+**Seriennummer**, eine dieser Stellen reicht:
+
+- Am Drucker: Einstellungen → **Gerät** bzw. Geräteinformationen
+- In **Bambu Handy** (Handy-App): Drucker antippen → Einstellungen → Geräteinformationen
+- In **Bambu Studio**: Reiter **Gerät** → Bereich **Update**, dort steht sie neben der Firmware-Version
+- Auf dem Aufkleber am Drucker (meist hinten oder unten), die Nummer hinter „SN“
 
 ## 4. Jedes Mal vor dem Streamen
 
@@ -77,4 +94,4 @@ Mehrere kombinieren mit `&`, z. B. `http://localhost:5000/view/overlay?color=c02
 
 - **Overlay bleibt leer / zeigt „–“:** Läuft das schwarze Fenster von Bambu2OBS noch? Startet gerade ein Druck? Die Daten kommen erst, sobald der Drucker welche sendet.
 - **Keine Verbindung zum Drucker:** IP-Adresse und Access Code nochmal prüfen (`.env` löschen und neu starten). Bei neueren Firmware-Versionen muss am Drucker eventuell der **LAN-Modus** bzw. **Entwicklermodus** aktiviert werden, damit externe Programme mitlesen dürfen.
-- **Die IP-Adresse ändert sich ständig:** Im Router dem Drucker eine feste IP-Adresse geben.
+- **Overlay ging, nach ein paar Tagen aber nicht mehr:** Der Router hat dem Drucker vermutlich eine neue IP-Adresse gegeben. Im Router eine feste Adresse einstellen (FritzBox: **Heimnetz → Netzwerk** → beim Drucker auf den Stift klicken → **„Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“**). Danach die `.env` neben der .exe löschen und die .exe neu starten.
