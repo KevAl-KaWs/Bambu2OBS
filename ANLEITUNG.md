@@ -24,17 +24,13 @@ Python oder sonstige Programme brauchst du **nicht**.
 
 1. **`Bambu2OBS.exe`** doppelklicken.
    Falls Windows „Der Computer wurde durch Windows geschützt“ anzeigt: auf **„Weitere Informationen“** → **„Trotzdem ausführen“** klicken. (Das kommt bei kleinen Programmen ohne gekaufte Signatur.)
-2. Im schwarzen Fenster wirst du einmalig nach diesen Angaben gefragt:
+2. Es öffnet sich ein schwarzes Fenster – und im Browser automatisch die **Einstellungsseite**.
+3. Dort **IP-Adresse**, **Access Code** und **Seriennummer** eintragen und auf **„Speichern & verbinden“** klicken. Wo du die Angaben findest, steht im nächsten Abschnitt (und auf der Seite unter „Wo finde ich das?“).
+4. Oben rechts erscheint **„Mit dem Drucker verbunden“** – fertig.
 
-   - **IP-Adresse** und **Access Code**
-   - **Seriennummer**
-   - **E-Mail / Passwort** des Bambu-Kontos: **optional**, einfach mit Enter überspringen. Mit Bambu-Konto wird der Modellname von MakerWorld angezeigt, ohne Konto der Dateiname des Drucks.
+![Einstellungsseite](images/settings_page.png)
 
-   Wo du IP-Adresse, Access Code und Seriennummer findest, steht im nächsten Abschnitt.
-
-   Die Angaben werden fest in Windows gespeichert (unter `%APPDATA%\Bambu2OBS`), nicht im Programmordner. Bei einem Update oder wenn du die .exe woanders hin verschiebst, bleiben sie also erhalten.
-
-   **Einstellungen später ändern:** Direkt nach dem Start der .exe innerhalb von 5 Sekunden die Taste **E** drücken. Dann wirst du nochmal gefragt. Mit Enter behältst du den bisherigen Wert, du musst also nur das eintippen, was sich geändert hat.
+Die Einstellungsseite erreichst du jederzeit unter **http://localhost:5000**, solange Bambu2OBS läuft. Dort stellst du auch alles fürs Overlay ein (siehe Abschnitt 6). Alle Einstellungen werden fest in Windows gespeichert (`%APPDATA%\Bambu2OBS`), nicht im Programmordner – bei einem Update bleiben sie also erhalten.
 
 ### Wo finde ich IP-Adresse, Access Code und Seriennummer?
 
@@ -56,7 +52,7 @@ Den Access Code am besten direkt beim ersten Start vom Display ablesen. Er kann 
 
 ## 4. Jedes Mal vor dem Streamen
 
-**`Bambu2OBS.exe`** starten und das schwarze Fenster offen lassen, solange das Overlay laufen soll. Zum Beenden das Fenster schließen.
+**`Bambu2OBS.exe`** starten und das schwarze Fenster offen lassen, solange das Overlay laufen soll. Zum Beenden das Fenster schließen. Die Einstellungsseite brauchst du dafür nicht – die kannst du zumachen.
 
 ## 5. Alternative: mit Python starten (für Bastler)
 
@@ -72,54 +68,49 @@ python src\bambu2obs.py
 ## 6. In OBS einbinden
 
 1. In OBS bei **Quellen** auf **+** → **Browser** klicken.
-2. Als URL eintragen:
+2. Als URL eintragen (auf der Einstellungsseite gibt es dafür einen **Kopieren**-Knopf):
 
    ```
    http://localhost:5000/view/overlay
    ```
 
 3. **Breite: 600**, **Höhe: 130** – fertig. Die Quelle lässt sich danach beliebig im Bild verschieben und skalieren.
+4. Damit die Zuschauer den Fertig-Sound hören: in den Eigenschaften der Browserquelle **„Audio über OBS steuern“** anhaken. Der Sound erscheint dann im Audio-Mixer als eigene Spur und geht mit in den Stream. Wenn du ihn selbst auch hören willst: im Mixer bei der Quelle auf ⚙️ → **Erweiterte Audioeigenschaften** → Audioüberwachung **„Überwachen und ausgeben“**.
 
-### Aussehen anpassen (optional)
+### Aussehen und Sound einstellen
 
-Einfach an die URL anhängen:
+Alles auf der Einstellungsseite **http://localhost:5000** – mit Live-Vorschau. Änderungen wirken **sofort auch in OBS**, an der Adresse in OBS musst du nie etwas ändern.
 
-| Zusatz | Wirkung |
-|---|---|
-| `?name=Printcess` | Name des Druckers, dann steht da z. B. „Printcess druckt gerade“ oder „Printcess ist fertig!“ |
-| `?color=ff4fa3` | Farbe des Balkens (Hex-Farbcode ohne `#`), Standard ist Pink |
-| `?card=0` | Ohne dunklen Hintergrund-Kasten |
-| `?cover=0` | Ohne Vorschaubild |
-| `?sound=0` | Kein Sound bei „fertig“ |
-| `?volume=40` | Lautstärke des Fertig-Sounds von 0 bis 100 (Standard 70) |
-| `?test=fertig` | Zeigt sofort die Fertig-Einblendung, zum Ausprobieren. Danach wieder entfernen! |
+- **Name des Druckers**, z. B. „Printcess“ → im Overlay steht „Printcess druckt gerade“, „Printcess macht Pause“, „Printcess ist fertig!“
+- **Farbe des Balkens** (Pink, Lila, Türkis … oder eigene Farbe)
+- **Dunkler Kasten** und **Vorschaubild** an/aus
+- **Fertig-Sound** an/aus, **Lautstärke**, **eigenen Sound hochladen** (MP3, WAV oder OGG)
+- **„Fertig-Einblendung testen“** – löst die Einblendung sofort in der Vorschau und in OBS aus
 
-Mehrere kombinieren mit `&`, z. B. `http://localhost:5000/view/overlay?name=Printcess&color=c026d3`
+### Die Fertig-Einblendung
 
-Die URL änderst du in OBS mit einem Doppelklick auf die Browserquelle.
+Sobald der Drucker fertig ist, gibt es Konfetti, der Kasten leuchtet, dort steht z. B. „Printcess ist fertig! 🎉“ und es ertönt ein kurzer Glockenklang (oder dein eigener Sound). Sie kommt nur, wenn ein Druck wirklich gerade fertig wird – nicht, wenn OBS neu gestartet wird.
 
-### Fertig-Einblendung mit Sound
+<details>
+<summary>Für Bastler: Einstellungen per URL überschreiben</summary>
 
-Sobald der Drucker fertig ist, gibt es pinkes Konfetti, der Kasten leuchtet, dort steht z. B. „Printcess ist fertig! 🎉“ und es ertönt ein kurzer Glockenklang.
-
-- **Eigener Sound:** Eine Datei **`fertig.mp3`** (oder `fertig.wav` / `fertig.ogg`) neben die `Bambu2OBS.exe` oder in den Einstellungsordner `%APPDATA%\Bambu2OBS` legen, dann wird stattdessen die abgespielt.
-- **Damit die Zuschauer den Sound hören:** In den Eigenschaften der Browserquelle das Häkchen **„Audio über OBS steuern“** setzen. Der Sound erscheint dann im Audio-Mixer als eigene Spur und geht mit in den Stream. Wenn du ihn selbst auch hören willst: im Mixer bei der Quelle auf ⚙️ → **Erweiterte Audioeigenschaften** → Audioüberwachung **„Überwachen und ausgeben“**.
-- **Ausprobieren:** `&test=fertig` an die URL hängen, dann kommt die Einblendung sofort. Danach wieder entfernen.
+An die OBS-Adresse angehängt, haben diese Werte Vorrang vor der Einstellungsseite – praktisch z. B. für eine zweite Szene mit anderem Aussehen:
+`?name=Printcess`, `?color=ff4fa3`, `?card=0`, `?cover=0`, `?sound=0`, `?volume=40`, `?test=fertig` (zeigt dauerhaft die Fertig-Einblendung, nur zum Ausprobieren). Mehrere kombinieren mit `&`.
+</details>
 
 ## 7. Auf eine neue Version updaten
 
 1. Bambu2OBS schließen (das schwarze Fenster).
 2. Unter **„Releases“** auf dieser GitHub-Seite die neueste `Bambu2OBS-Windows-….zip` herunterladen.
 3. Die neue **`Bambu2OBS.exe`** über die alte kopieren, oder einfach woanders entpacken – egal wohin.
-4. Bambu2OBS starten. Deine Drucker-Daten sind gespeichert, du musst nichts neu eingeben. Auch in OBS bleibt alles, wie es ist. Falls das Overlay in OBS noch alt aussieht: Browserquelle anklicken → **„Seite aktualisieren“** bzw. in den Eigenschaften „Cache der aktuellen Seite aktualisieren“.
-
-Eine eigene `fertig.mp3` musst du nur mitnehmen, wenn du den Ordner wechselst – oder du legst sie gleich nach `%APPDATA%\Bambu2OBS` (Windows-Taste + R drücken, `%APPDATA%\Bambu2OBS` eintippen, Enter), dann ist sie auch für jede neue Version da.
+4. Bambu2OBS starten. Deine Einstellungen und ein eigener Sound sind gespeichert, du musst nichts neu eingeben. Auch in OBS bleibt alles, wie es ist. Falls das Overlay in OBS noch alt aussieht: Browserquelle anklicken → **„Seite aktualisieren“** bzw. in den Eigenschaften „Cache der aktuellen Seite aktualisieren“.
 
 Die Versionsnummer steht im Namen der ZIP-Datei, z. B. `Bambu2OBS-Windows-v1.2.0.zip`. Ist die Nummer auf GitHub höher als bei deiner Datei, gibt es etwas Neues.
 
 ## 8. Wenn etwas nicht klappt
 
+- **Einstellungsseite geht nicht auf:** Läuft das schwarze Fenster? Dann im Browser **http://localhost:5000** eintippen.
 - **Overlay bleibt leer / zeigt „–“:** Läuft das schwarze Fenster von Bambu2OBS noch? Startet gerade ein Druck? Die Daten kommen erst, sobald der Drucker welche sendet.
-- **Keine Verbindung zum Drucker:** IP-Adresse und Access Code nochmal prüfen (beim Start **E** drücken und neu eingeben). Bei neueren Firmware-Versionen muss am Drucker eventuell der **LAN-Modus** bzw. **Entwicklermodus** aktiviert werden, damit externe Programme mitlesen dürfen.
+- **Keine Verbindung zum Drucker:** Auf der Einstellungsseite (http://localhost:5000) steht oben rechts, was los ist. IP-Adresse und Access Code nochmal prüfen und speichern. Bei neueren Firmware-Versionen muss am Drucker eventuell der **LAN-Modus** bzw. **Entwicklermodus** aktiviert werden, damit externe Programme mitlesen dürfen.
 - **Kein Vorschaubild:** Das Bild wird bei jedem neuen Druck von der **SD-Karte im Drucker** geholt. Ohne SD-Karte geht das nicht. Bei einem Druck, der schon lief, bevor Bambu2OBS gestartet wurde, kann es ein paar Sekunden dauern.
-- **Overlay ging, nach ein paar Tagen aber nicht mehr:** Der Router hat dem Drucker vermutlich eine neue IP-Adresse gegeben. Im Router eine feste Adresse einstellen (FritzBox: **Heimnetz → Netzwerk** → beim Drucker auf den Stift klicken → **„Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“**). Danach die .exe neu starten, **E** drücken und die neue IP-Adresse eintragen.
+- **Overlay ging, nach ein paar Tagen aber nicht mehr:** Der Router hat dem Drucker vermutlich eine neue IP-Adresse gegeben. Im Router eine feste Adresse einstellen (FritzBox: **Heimnetz → Netzwerk** → beim Drucker auf den Stift klicken → **„Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“**). Danach auf der Einstellungsseite die neue IP-Adresse eintragen und speichern.

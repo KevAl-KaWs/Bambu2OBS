@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, Response, send_from_directory, render_template_string
+from flask import Flask, jsonify, Response, send_from_directory, render_template_string, request
 from werkzeug.utils import secure_filename, safe_join
 from flask_cors import CORS
 import os
@@ -7,6 +7,7 @@ import logging
 from dotenv import load_dotenv
 from threading import Thread
 import sys
+import json
 
 # Load environment variables
 load_dotenv()
@@ -20,7 +21,57 @@ TEMPLATE_DIR = os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(os.path.abs
 SVG_FILES = ['Filaments.svg', 'ActiveFilament.svg']
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Only the read-only overlay data may be read by other origins, never the settings (access code)
+CORS(app, resources={r"/progress": {}, r"/status": {}, r"/svg/*": {}, r"/updates/*": {}})
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # sound uploads
+
+# Shared with bambu2obs.py when started from there (settings hooks, connection state)
+runtime = {}
+
+SETTINGS_DIR = CONFIG_DIR or BASE_DIR
+OVERLAY_SETTINGS_PATH = os.path.join(SETTINGS_DIR, 'overlay.json')
+OVERLAY_DEFAULTS = {
+    'name': '',
+    'color': '#ff4fa3',
+    'card': True,
+    'cover': True,
+    'sound': True,
+    'volume': 70,
+}
+
+def read_overlay_settings():
+    settings = dict(OVERLAY_DEFAULTS)
+    try:
+        with open(OVERLAY_SETTINGS_PATH, 'r', encoding='utf-8') as file:
+            stored = json.load(file)
+        settings.update({k: v for k, v in stored.items() if k in OVERLAY_DEFAULTS})
+    except (FileNotFoundError, ValueError, OSError):
+        pass
+    return settings
+
+def write_overlay_settings(values):
+    settings = read_overlay_settings()
+    for key, default in OVERLAY_DEFAULTS.items():
+        if key not in values:
+            continue
+        value = values[key]
+        if isinstance(default, bool):
+            settings[key] = bool(value)
+        elif isinstance(default, int):
+            settings[key] = max(0, min(100, int(value)))
+        else:
+            settings[key] = str(value).strip()[:60]
+    os.makedirs(SETTINGS_DIR, exist_ok=True)
+    with open(OVERLAY_SETTINGS_PATH, 'w', encoding='utf-8') as file:
+        json.dump(settings, file, ensure_ascii=False, indent=2)
+    return settings
+
+@app.before_request
+def protect_settings_api():
+    """Changing settings needs a custom header: other websites cannot send it without CORS."""
+    if request.path.startswith('/api/') and request.method not in ('GET', 'HEAD', 'OPTIONS'):
+        if request.headers.get('X-Bambu2OBS') != '1':
+            return jsonify({'error': 'forbidden'}), 403
 
 # Configure logging
 app.logger.setLevel(logging.DEBUG)
@@ -87,11 +138,94 @@ def get_status():
         'hasCover': os.path.exists(cover_path),
         'coverVersion': int(os.path.getmtime(cover_path)) if os.path.exists(cover_path) else 0,
         'hasSound': find_sound_file() is not None,
+        'overlay': read_overlay_settings(),
+        'testFinishAt': runtime.get('test_finish_at', 0),
     })
+
+@app.route('/')
+def settings_view():
+    return send_from_directory(TEMPLATE_DIR, 'settings.html')
+
+@app.route('/view/settings.js')
+def settings_script():
+    return send_from_directory(TEMPLATE_DIR, 'settings.js')
+
+@app.route('/api/settings', methods=['GET'])
+def api_get_settings():
+    printer = runtime['read_settings']() if 'read_settings' in runtime else {}
+    connection = runtime.get('connection', {'state': 'standalone' if 'read_settings' not in runtime else 'unconfigured'})
+    last_message = runtime.get('last_message')
+    sound = find_sound_file()
+    return jsonify({
+        'printer': {
+            'ip': printer.get('PRINTER_IP', ''),
+            'accessCode': printer.get('ACCESS_CODE', ''),
+            'serial': printer.get('PRINTER_SN', ''),
+            'email': printer.get('EMAIL', ''),
+            'hasPassword': bool(printer.get('PASSWORD')),
+        },
+        'overlay': read_overlay_settings(),
+        'connection': dict(
+            connection,
+            sinceAgo=(time.time() - connection['since']) if connection.get('since') else None,
+            lastMessageAgo=(time.time() - last_message) if last_message else None,
+        ),
+        'sound': sound[1] if sound else None,
+        'canSavePrinter': 'save_printer_settings' in runtime,
+    })
+
+@app.route('/api/settings/printer', methods=['POST'])
+def api_save_printer():
+    if 'save_printer_settings' not in runtime:
+        return jsonify({'error': 'Nur verfügbar, wenn Bambu2OBS gestartet ist.'}), 503
+    data = request.get_json(silent=True) or {}
+    values = {
+        'PRINTER_IP': data.get('ip', ''),
+        'ACCESS_CODE': data.get('accessCode', ''),
+        'PRINTER_SN': data.get('serial', ''),
+        'EMAIL': data.get('email', ''),
+    }
+    # Empty password field keeps the stored password; without e-mail it is removed
+    if not values['EMAIL']:
+        values['PASSWORD'] = ''
+    elif data.get('password'):
+        values['PASSWORD'] = data['password']
+    runtime['last_message'] = None
+    runtime['save_printer_settings'](values)
+    return jsonify({'ok': True})
+
+@app.route('/api/settings/overlay', methods=['POST'])
+def api_save_overlay():
+    return jsonify(write_overlay_settings(request.get_json(silent=True) or {}))
+
+@app.route('/api/test-finish', methods=['POST'])
+def api_test_finish():
+    runtime['test_finish_at'] = int(time.time() * 1000)
+    return jsonify({'ok': True})
+
+@app.route('/api/sound', methods=['POST', 'DELETE'])
+def api_sound():
+    sound_dir = SETTINGS_DIR
+    os.makedirs(sound_dir, exist_ok=True)
+    if request.method == 'POST':
+        upload = request.files.get('file')
+        extension = os.path.splitext(upload.filename)[1].lower() if upload and upload.filename else ''
+        if f'fertig{extension}' not in SOUND_FILES:
+            return jsonify({'error': 'Bitte eine MP3-, WAV- oder OGG-Datei wählen.'}), 400
+    # Only one custom sound at a time
+    for name in SOUND_FILES:
+        try:
+            os.remove(os.path.join(sound_dir, name))
+        except FileNotFoundError:
+            pass
+    if request.method == 'DELETE':
+        return jsonify({'ok': True})
+    upload.save(os.path.join(sound_dir, f'fertig{extension}'))
+    return jsonify({'ok': True, 'sound': f'fertig{extension}'})
 
 def find_sound_file():
     """Custom sound next to the .exe or in the settings folder."""
-    for directory in (APP_DIR, CONFIG_DIR):
+    for directory in (SETTINGS_DIR, APP_DIR):
         if not directory:
             continue
         for name in SOUND_FILES:

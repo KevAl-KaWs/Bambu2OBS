@@ -14,6 +14,7 @@ import signal
 import sys
 import xml.etree.ElementTree as ET
 import threading
+import webbrowser
 import shutil
 import ftplib
 import io
@@ -46,89 +47,72 @@ else:
         os.makedirs(CONFIG_DIR, exist_ok=True)
         shutil.copyfile(LOCAL_ENV_PATH, CONFIG_PATH)
 
-def ask(question, current=None, secret=False):
-    """Asks for a value; Enter keeps the current one."""
-    if current:
-        hint = 'gespeichert' if secret else current
-        answer = input(f"{question} [{hint}]: ").strip()
-        return answer or current
-    return input(f"{question}: ").strip()
+SETTINGS_URL = 'http://localhost:5000/'
+PRINTER_KEYS = ('PRINTER_IP', 'ACCESS_CODE', 'PRINTER_SN', 'EMAIL', 'PASSWORD', 'REGION')
 
-def run_setup():
-    """Asks for the printer details and writes the settings file."""
-    current = dotenv_values(ENV_PATH) if os.path.exists(ENV_PATH) else {}
-    print("=" * 60)
-    print(" Bambu2OBS - Einstellungen")
-    print(" Die Angaben findest du am Drucker unter Einstellungen -> WLAN/Netzwerk.")
-    if current:
-        print(" Enter drücken übernimmt den Wert in [Klammern].")
-    print("=" * 60)
-    printer_ip = ask("IP-Adresse des Druckers (z. B. 192.168.178.45)", current.get('PRINTER_IP'))
-    access_code = ask("Access Code des Druckers", current.get('ACCESS_CODE'))
-    printer_sn = ask("Seriennummer des Druckers", current.get('PRINTER_SN'))
-    print("Optional: Bambu-Konto für den Modellnamen von MakerWorld (leer lassen = ohne).")
-    email = ask("Bambu-Konto E-Mail", current.get('EMAIL'))
-    password = ask("Bambu-Konto Passwort", current.get('PASSWORD'), secret=True) if email else ''
+def read_settings():
+    return dict(dotenv_values(ENV_PATH)) if os.path.exists(ENV_PATH) else {}
+
+def save_printer_settings(values):
+    """Called by the settings page: stores the printer details and reconnects."""
+    settings = read_settings()
+    for key in PRINTER_KEYS:
+        if key in values and values[key] is not None:
+            settings[key] = str(values[key]).strip()
+    settings.setdefault('REGION', 'global')
+    settings.setdefault('BASE_DIR', 'data')
     os.makedirs(os.path.dirname(ENV_PATH), exist_ok=True)
     with open(ENV_PATH, 'w', encoding='utf-8') as env_file:
-        env_file.write(
-            f"EMAIL={email}\nPASSWORD={password}\nREGION=global\n"
-            f"PRINTER_SN={printer_sn}\nPRINTER_IP={printer_ip}\nACCESS_CODE={access_code}\nBASE_DIR=data\n"
-        )
-    print(f"Einstellungen gespeichert in {ENV_PATH}\n")
+        for key, value in settings.items():
+            env_file.write(f"{key}={value or ''}\n")
+    apply_settings()
+    settings_changed.set()
 
-def offer_settings_change(seconds=5):
-    """On Windows: pressing E right after the start opens the settings again."""
-    try:
-        import msvcrt
-    except ImportError:
-        return False
-    print(f"Einstellungen ändern? Innerhalb von {seconds} Sekunden die Taste E drücken ...")
-    end = time.time() + seconds
-    while time.time() < end:
-        if msvcrt.kbhit() and msvcrt.getwch().lower() == 'e':
-            return True
-        time.sleep(0.05)
-    print("Starte mit den gespeicherten Einstellungen.\n")
-    return False
+def apply_settings():
+    global REGION, EMAIL, PASSWORD, PRINTER_SN, PRINTER_IP, ACCESS_CODE
+    settings = read_settings()
+    REGION = settings.get('REGION') or 'global'
+    EMAIL = settings.get('EMAIL') or ''
+    PASSWORD = settings.get('PASSWORD') or ''
+    PRINTER_SN = settings.get('PRINTER_SN') or ''
+    PRINTER_IP = settings.get('PRINTER_IP') or ''
+    ACCESS_CODE = settings.get('ACCESS_CODE') or ''
 
-if __name__ == '__main__':
-    if not os.path.exists(ENV_PATH) or offer_settings_change():
-        run_setup()
+def printer_configured():
+    return bool(PRINTER_IP and ACCESS_CODE and PRINTER_SN)
+
+settings_changed = threading.Event()
 
 # Load environment variables
 load_dotenv(ENV_PATH)
 
+server_runtime = {}
+
+def set_connection(state, detail=''):
+    """Connection state for the settings page."""
+    server_runtime['connection'] = {'state': state, 'detail': detail, 'since': time.time()}
+
 # Additional global variable to track the first run
 is_first_run = True
 
-subprocesses = []  # List to keep track of subprocesses
 
 def launch_progress_server():
     """Starts the overlay web server in a background thread (also works inside the .exe)."""
     import progressbarServer
+    progressbarServer.runtime['save_printer_settings'] = save_printer_settings
+    progressbarServer.runtime['read_settings'] = read_settings
+    globals()['server_runtime'] = progressbarServer.runtime
     server_thread = threading.Thread(
         target=lambda: progressbarServer.app.run(port=5000, use_reloader=False),
         daemon=True,
     )
     server_thread.start()
 
-def cleanup_subprocesses():
-    """Terminates all running subprocesses initiated by this script."""
-    for proc in subprocesses:
-        proc.terminate()  # Terminate the subprocess
-        proc.wait()       # Wait for the subprocess to exit
-
 # Define the path for the ConnectionDumps.json file in the data subdirectory
 
 # Retrieve environment variables
-REGION = os.getenv('REGION')
-EMAIL = os.getenv('EMAIL')
-PASSWORD = os.getenv('PASSWORD')
-USERNAME = os.getenv('USERNAME')
-PRINTER_SN = os.getenv('PRINTER_SN')
-PRINTER_IP = os.getenv('PRINTER_IP')
-ACCESS_CODE = os.getenv('ACCESS_CODE')
+REGION = EMAIL = PASSWORD = PRINTER_SN = PRINTER_IP = ACCESS_CODE = ''
+apply_settings()
 BASE_DIR = os.path.join(APP_DIR, os.getenv('BASE_DIR') or 'data')
 # progressbarServer reads BASE_DIR from the environment, so hand over the absolute path
 os.environ['BASE_DIR'] = BASE_DIR
@@ -453,8 +437,24 @@ def fetch_cover_from_printer(print_name, gcode_file):
     except Exception as e:
         print(f"Could not load preview image from printer: {e}")
 
+CONNECT_ERRORS = {
+    1: 'Verbindung abgelehnt (falsches Protokoll)',
+    3: 'Drucker nicht erreichbar',
+    4: 'Access Code falsch',
+    5: 'Access Code falsch oder LAN-Zugriff am Drucker gesperrt',
+}
+
+def on_disconnect(client, userdata, rc):
+    if rc != 0:
+        print(f"Connection to printer lost (rc={rc}), retrying ...")
+        set_connection('connecting', 'Verbindung unterbrochen, versuche erneut ...')
+
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
+    if rc != 0:
+        set_connection('error', CONNECT_ERRORS.get(rc, f'Verbindung fehlgeschlagen (Code {rc})'))
+        return
+    set_connection('connected')
     client.subscribe(f"device/{PRINTER_SN}/report")
     # P1/A1 only send changes, so ask once for the full status (print name etc.)
     client.publish(f"device/{PRINTER_SN}/request", json.dumps({"pushing": {"sequence_id": "0", "command": "pushall"}}))
@@ -465,8 +465,9 @@ previous_job_key = None
 
 def on_message(client, userdata, msg):
     global total_layer_num_global, previous_job_key
-    print(" ")
-    print(f"Message received -> Topic: {msg.topic} Message: {msg.payload.decode('utf-8')}")
+    server_runtime['last_message'] = time.time()
+    if DUMP_MESSAGES:
+        print(f"Message received -> Topic: {msg.topic} Message: {msg.payload.decode('utf-8')}")
     try:
         message_data = json.loads(msg.payload.decode('utf-8'))
 
@@ -673,40 +674,65 @@ def setup_mqtt_listener():
     client.tls_set(tls_version=ssl.PROTOCOL_TLS, cert_reqs=ssl.CERT_NONE)
     client.tls_insecure_set(True)
     client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
     client.on_message = on_message
     client.username_pw_set(username="bblp", password=ACCESS_CODE)
-    client.connect(PRINTER_IP, 8883, 60)
+    client.reconnect_delay_set(min_delay=2, max_delay=30)
+    # connect_async + loop_start: paho keeps retrying in the background if the printer is off
+    client.connect_async(PRINTER_IP, 8883, 60)
+    client.loop_start()
     return client
+
+def stop_mqtt_listener(client):
+    try:
+        client.disconnect()
+        client.loop_stop()
+    except Exception as e:
+        print(f"Error while disconnecting: {e}")
+
+def wait_for_settings_change():
+    """Waits until the settings page saves new printer details (Ctrl+C still works)."""
+    while not settings_changed.wait(timeout=1):
+        pass
+    settings_changed.clear()
 
 def main():
     """
-    Main function to initialize Bambu Cloud connection, start progress bar server,
-    and handle MQTT messages for Bambu 3D printer status updates.
+    Starts the overlay/settings web server and keeps the printer connection
+    in sync with the settings page.
     """
-    # Process the latest task from Bambu Cloud (optional), forcing update on the first run
-    try_process_latest_task(force_update=is_first_run)
-
+    global previous_job_key
     launch_progress_server()
-    print("Progress bar server started.")
-    print("OBS overlay: http://localhost:5000/view/overlay")
+    print("=" * 60)
+    print(" Bambu2OBS läuft - dieses Fenster offen lassen.")
+    print(f" Einstellungen:  {SETTINGS_URL}")
+    print(" OBS-Overlay:    http://localhost:5000/view/overlay")
+    print("=" * 60)
 
     try:
-        # Setup and start MQTT listener for real-time printer status updates
-        print("Connecting to the printer's local MQTT service...")
-        mqtt_client = setup_mqtt_listener()
-        mqtt_client.loop_forever()
+        if not printer_configured():
+            set_connection('unconfigured')
+            print("Noch keine Drucker-Daten: Die Einstellungsseite öffnet sich im Browser.")
+            time.sleep(1)
+            webbrowser.open(SETTINGS_URL)
+
+        while True:
+            if not printer_configured():
+                set_connection('unconfigured')
+                wait_for_settings_change()
+                continue
+
+            # Process the latest task from Bambu Cloud (optional)
+            try_process_latest_task(force_update=True)
+            print(f"Connecting to printer {PRINTER_IP} ...")
+            set_connection('connecting', f'Verbinde mit {PRINTER_IP} ...')
+            previous_job_key = None
+            mqtt_client = setup_mqtt_listener()
+            wait_for_settings_change()
+            print("Settings changed, reconnecting ...")
+            stop_mqtt_listener(mqtt_client)
     except KeyboardInterrupt:
         print("Interrupt received, stopping...")
-    except Exception as e:
-        print(f"Unhandled exception: {e}")
-        print("Verbindung zum Drucker fehlgeschlagen - IP-Adresse und Access Code in der .env pruefen.")
-    finally:
-        cleanup_subprocesses()
-        print("Progress bar server stopped.")
-        # Keep the .exe window open so the message can be read
-        if getattr(sys, 'frozen', False):
-            input("Enter druecken zum Beenden ...")
 
 if __name__ == "__main__":
     main()
-    

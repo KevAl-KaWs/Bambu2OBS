@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bambu2OBS Einstellungen</title>
+    <style>
+        :root {
+            --accent: #ff4fa3;
+            --accent-soft: rgba(255, 79, 163, 0.14);
+            --bg: #15151c;
+            --panel: #1f1f29;
+            --panel-2: #282834;
+            --line: #34343f;
+            --text: #f4f4f8;
+            --muted: #a3a3b2;
+            --ok: #3ddc97;
+            --warn: #ffb547;
+            --err: #ff5d6c;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; background: var(--bg); color: var(--text); }
+        body {
+            font-family: "Segoe UI", system-ui, -apple-system, sans-serif, "Segoe UI Emoji";
+            font-size: 15px;
+            line-height: 1.45;
+        }
+        .wrap { max-width: 780px; margin: 0 auto; padding: 28px 16px 60px; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        h1 { font-size: 24px; margin: 0; letter-spacing: -0.01em; }
+        h1 span { color: var(--accent); }
+        h2 { font-size: 17px; margin: 0 0 14px; }
+        .pill {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 12px; border-radius: 999px;
+            background: var(--panel); border: 1px solid var(--line);
+            font-size: 14px;
+        }
+        .pill::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+        .pill.ok::before { background: var(--ok); }
+        .pill.warn::before { background: var(--warn); }
+        .pill.err::before { background: var(--err); }
+        section {
+            background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+            padding: 20px; margin-bottom: 16px;
+        }
+        .preview {
+            border-radius: 10px; overflow: hidden; height: 130px;
+            background:
+                linear-gradient(135deg, rgba(255,255,255,0.04) 25%, transparent 25%) 0 0 / 20px 20px,
+                linear-gradient(225deg, rgba(255,255,255,0.04) 25%, transparent 25%) 0 0 / 20px 20px,
+                #0d0d12;
+        }
+        .preview iframe { width: 100%; height: 130px; border: 0; display: block; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; }
+        .field { margin-bottom: 14px; }
+        .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+        input[type=text], input[type=password], input[type=email] {
+            width: 100%; padding: 10px 12px; border-radius: 9px;
+            border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+            font: inherit;
+        }
+        input:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+        button {
+            font: inherit; font-weight: 600; cursor: pointer;
+            border-radius: 9px; padding: 10px 16px; border: 1px solid var(--line);
+            background: var(--panel-2); color: var(--text);
+        }
+        button:hover { border-color: var(--accent); }
+        button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+        button.primary:hover { filter: brightness(1.08); }
+        button.big { width: 100%; padding: 14px; font-size: 16px; }
+        .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .url {
+            flex: 1 1 260px; font-family: Consolas, ui-monospace, monospace; font-size: 14px;
+            padding: 10px 12px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line);
+            user-select: all; overflow-x: auto; white-space: nowrap;
+        }
+        .msg { min-height: 20px; font-size: 14px; color: var(--muted); }
+        .msg.ok { color: var(--ok); }
+        .msg.err { color: var(--err); }
+        details { margin-bottom: 14px; }
+        summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
+        details ul { margin: 0 0 10px; padding-left: 20px; color: var(--muted); font-size: 14px; }
+        .swatches { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .swatch {
+            width: 34px; height: 34px; border-radius: 50%; padding: 0;
+            border: 2px solid transparent;
+        }
+        .swatch[aria-pressed=true] { border-color: #fff; }
+        input[type=color] { width: 44px; height: 36px; border: 0; padding: 0; background: none; cursor: pointer; }
+        .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+        .switch:first-of-type { border-top: 0; }
+        .switch span { font-weight: 600; }
+        .switch small { display: block; font-weight: 400; color: var(--muted); }
+        .switch input { width: 46px; height: 26px; accent-color: var(--accent); cursor: pointer; }
+        input[type=range] { width: 100%; accent-color: var(--accent); }
+        footer { color: var(--muted); font-size: 13px; text-align: center; margin-top: 24px; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <h1>Bambu<span>2</span>OBS</h1>
+        <div class="pill" id="status" role="status">Lade …</div>
+    </header>
+
+    <section aria-labelledby="h-preview">
+        <h2 id="h-preview">Vorschau &amp; OBS</h2>
+        <div class="preview"><iframe id="preview" src="/view/overlay?demo=1" title="Overlay-Vorschau"></iframe></div>
+        <p class="hint">In OBS: Quellen → <b>+</b> → <b>Browser</b>, diese Adresse eintragen, Breite <b>600</b>, Höhe <b>130</b>. Änderungen hier wirken sofort, auch in OBS.</p>
+        <div class="row">
+            <div class="url" id="obs-url">http://localhost:5000/view/overlay</div>
+            <button type="button" id="copy-url">Kopieren</button>
+        </div>
+    </section>
+
+    <section aria-labelledby="h-printer">
+        <h2 id="h-printer">Drucker</h2>
+        <form id="printer-form" autocomplete="off">
+            <div class="grid">
+                <div class="field">
+                    <label for="ip">IP-Adresse</label>
+                    <input type="text" id="ip" placeholder="z. B. 192.168.178.45" inputmode="decimal" required>
+                </div>
+                <div class="field">
+                    <label for="accessCode">Access Code</label>
+                    <input type="text" id="accessCode" placeholder="8 Zeichen" required>
+                </div>
+            </div>
+            <div class="field">
+                <label for="serial">Seriennummer</label>
+                <input type="text" id="serial" placeholder="z. B. 01P00A123456789" required>
+            </div>
+            <details>
+                <summary>Wo finde ich das?</summary>
+                <ul>
+                    <li><b>IP-Adresse &amp; Access Code:</b> am Drucker-Display, Zahnrad → <b>WLAN</b> (A1/P1) bzw. Reiter <b>Netzwerk</b> (X1).</li>
+                    <li><b>Seriennummer:</b> am Drucker unter Einstellungen → Gerät, in Bambu Handy unter Geräteinformationen, in Bambu Studio im Reiter Gerät → Update, oder auf dem Aufkleber hinter „SN“.</li>
+                </ul>
+            </details>
+            <details>
+                <summary>Bambu-Konto (optional)</summary>
+                <p class="hint">Nur für den Modellnamen von MakerWorld. Ohne Konto wird der Dateiname angezeigt, alles andere funktioniert genauso.</p>
+                <div class="grid">
+                    <div class="field">
+                        <label for="email">E-Mail</label>
+                        <input type="email" id="email">
+                    </div>
+                    <div class="field">
+                        <label for="password">Passwort</label>
+                        <input type="password" id="password" autocomplete="new-password">
+                        <div class="hint" id="password-hint"></div>
+                    </div>
+                </div>
+            </details>
+            <div class="row">
+                <button type="submit" class="primary">Speichern &amp; verbinden</button>
+                <span class="msg" id="printer-msg" aria-live="polite"></span>
+            </div>
+        </form>
+    </section>
+
+    <section aria-labelledby="h-overlay">
+        <h2 id="h-overlay">Overlay</h2>
+        <div class="field">
+            <label for="name">Name des Druckers</label>
+            <input type="text" id="name" placeholder="z. B. Printcess" maxlength="40">
+            <div class="hint">Dann steht im Overlay z. B. „Printcess druckt gerade“.</div>
+        </div>
+        <div class="field">
+            <label id="color-label">Farbe des Balkens</label>
+            <div class="swatches" role="group" aria-labelledby="color-label" id="swatches">
+                <button type="button" class="swatch" data-color="#ff4fa3" style="background:#ff4fa3" aria-label="Pink"></button>
+                <button type="button" class="swatch" data-color="#c026d3" style="background:#c026d3" aria-label="Lila"></button>
+                <button type="button" class="swatch" data-color="#8b5cf6" style="background:#8b5cf6" aria-label="Violett"></button>
+                <button type="button" class="swatch" data-color="#22b8cf" style="background:#22b8cf" aria-label="Türkis"></button>
+                <button type="button" class="swatch" data-color="#00ae42" style="background:#00ae42" aria-label="Bambu-Grün"></button>
+                <button type="button" class="swatch" data-color="#ff8a00" style="background:#ff8a00" aria-label="Orange"></button>
+                <input type="color" id="color" aria-label="Eigene Farbe" value="#ff4fa3">
+            </div>
+        </div>
+        <label class="switch"><span>Dunkler Kasten<small>Hintergrund hinter dem Overlay</small></span><input type="checkbox" id="card"></label>
+        <label class="switch"><span>Vorschaubild<small>Bild des Modells links</small></span><input type="checkbox" id="cover"></label>
+        <span class="msg" id="overlay-msg" aria-live="polite"></span>
+    </section>
+
+    <section aria-labelledby="h-sound">
+        <h2 id="h-sound">Fertig-Einblendung</h2>
+        <label class="switch"><span>Sound abspielen<small>Damit die Zuschauer ihn hören: in OBS bei der Browserquelle „Audio über OBS steuern“ anhaken.</small></span><input type="checkbox" id="sound"></label>
+        <div class="field">
+            <label for="volume">Lautstärke: <span id="volume-value">70</span> %</label>
+            <input type="range" id="volume" min="0" max="100" step="5">
+        </div>
+        <div class="field">
+            <label>Sound</label>
+            <div class="row">
+                <span id="sound-name" class="hint">Glockenklang (eingebaut)</span>
+                <button type="button" id="choose-sound">Eigenen Sound wählen …</button>
+                <button type="button" id="remove-sound" hidden>Entfernen</button>
+                <input type="file" id="sound-file" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg" hidden>
+            </div>
+        </div>
+        <button type="button" class="primary big" id="test-finish">🎉 Fertig-Einblendung testen</button>
+        <p class="hint">Löst die Einblendung in der Vorschau und gleichzeitig in OBS aus.</p>
+        <span class="msg" id="sound-msg" aria-live="polite"></span>
+    </section>
+
+    <footer>Diese Seite kannst du schließen – Bambu2OBS läuft im schwarzen Fenster weiter. Wieder öffnen: <b>http://localhost:5000</b></footer>
+</div>
+<script src="/view/settings.js"></script>
+</body>
+</html>

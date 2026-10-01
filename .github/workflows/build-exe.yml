@@ -38,9 +38,12 @@ jobs:
           $status = Invoke-WebRequest -UseBasicParsing http://localhost:5000/status
           $overlay = Invoke-WebRequest -UseBasicParsing http://localhost:5000/view/overlay
           $script = Invoke-WebRequest -UseBasicParsing http://localhost:5000/view/overlay.js
+          $settings = Invoke-WebRequest -UseBasicParsing http://localhost:5000/
+          $api = Invoke-WebRequest -UseBasicParsing http://localhost:5000/api/settings
+          Write-Host $api.Content
           Write-Host $status.Content
           Stop-Process -Id $proc.Id -Force
-          if ($overlay.StatusCode -ne 200 -or $script.StatusCode -ne 200) { exit 1 }
+          if ($overlay.StatusCode -ne 200 -or $script.StatusCode -ne 200 -or $settings.StatusCode -ne 200 -or -not $api.Content.Contains('192.0.2.1')) { exit 1 }
 
       - name: Package
         shell: pwsh

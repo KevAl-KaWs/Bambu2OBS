@@ -1,17 +1,9 @@
-// URL options, e.g. /view/overlay?name=Printcess&color=ff4fa3&cover=0&card=0&sound=0&volume=50&test=fertig
+// Settings come from the settings page (http://localhost:5000/).
+// URL options override them, e.g. /view/overlay?name=Printcess&color=ff4fa3&cover=0&card=0&sound=0&volume=50&test=fertig
 const params = new URLSearchParams(window.location.search);
-
-if (params.get('color')) {
-    const color = '#' + params.get('color').replace('#', '');
-    document.documentElement.style.setProperty('--bar', color);
-    document.documentElement.style.setProperty('--bar-light', color);
-}
-if (params.get('card') === '0') {
-    document.body.classList.add('no-card');
-}
-const showCover = params.get('cover') !== '0';
-
-const printerName = (params.get('name') || '').trim();
+const isTest = params.get('test') === 'fertig';
+const isDemo = params.get('demo') === '1';
+const CELEBRATION_MS = 12000;
 
 const NAMED_STATE_LABELS = {
     RUNNING: 'druckt gerade',
@@ -31,16 +23,56 @@ const STATE_LABELS = {
     IDLE: 'Kein Druck aktiv',
 };
 
+let options = { name: '', color: '#ff4fa3', card: true, cover: true, sound: true, volume: 70 };
 let lastCoverVersion = null;
 let lastState = null;
+let lastTestFinishAt = null;
 let celebrateUntil = 0;
-const playSound = params.get('sound') !== '0';
-const volume = Math.max(0, Math.min(100, Number(params.get('volume') ?? 70))) / 100;
-const isTest = params.get('test') === 'fertig';
-const CELEBRATION_MS = 12000;
+
+// Lighter shade of the bar colour for the gradient end
+function lighten(hex, amount) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!match) return hex;
+    const n = parseInt(match[1], 16);
+    const mix = (c) => Math.round(c + (255 - c) * amount);
+    return `rgb(${mix(n >> 16)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+}
+
+function flag(value) {
+    return value !== '0' && value !== 'false';
+}
+
+// Server settings first, URL parameters win
+function applyOptions(serverOptions) {
+    const merged = Object.assign({}, options, serverOptions || {});
+    if (params.has('name')) merged.name = params.get('name');
+    if (params.has('color')) merged.color = '#' + params.get('color').replace('#', '');
+    if (params.has('card')) merged.card = flag(params.get('card'));
+    if (params.has('cover')) merged.cover = flag(params.get('cover'));
+    if (params.has('sound')) merged.sound = flag(params.get('sound'));
+    if (params.has('volume')) merged.volume = Number(params.get('volume'));
+    merged.name = (merged.name || '').trim();
+    merged.volume = Math.max(0, Math.min(100, Number(merged.volume) || 0));
+    options = merged;
+
+    document.documentElement.style.setProperty('--bar', options.color);
+    document.documentElement.style.setProperty('--bar-light', lighten(options.color, 0.4));
+    document.body.classList.toggle('no-card', !options.card);
+}
 
 function finishedText() {
-    return printerName ? `${printerName} ist fertig! 🎉` : 'Fertig! 🎉';
+    return options.name ? `${options.name} ist fertig! 🎉` : 'Fertig! 🎉';
+}
+
+function formatDuration(minutes) {
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return h > 0 ? `${h} Std. ${m} Min.` : `${m} Min.`;
+}
+
+function formatEta(minutes) {
+    const eta = new Date(Date.now() + minutes * 60000);
+    return eta.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 }
 
 // Short chime, generated in the browser so no sound file is needed
@@ -48,6 +80,7 @@ function playChime() {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    const volume = options.volume / 100;
     const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
         const start = ctx.currentTime + i * 0.14;
@@ -66,10 +99,10 @@ function playChime() {
 }
 
 function playFinishSound(hasCustomSound) {
-    if (!playSound) return;
+    if (!options.sound || options.volume === 0) return;
     if (hasCustomSound) {
         const audio = new Audio(`/sound?t=${Date.now()}`);
-        audio.volume = volume;
+        audio.volume = options.volume / 100;
         audio.play().catch(playChime);
     } else {
         playChime();
@@ -81,8 +114,7 @@ function runConfetti(durationMs) {
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const style = getComputedStyle(document.documentElement);
-    const colors = [style.getPropertyValue('--bar').trim(), style.getPropertyValue('--bar-light').trim(), '#ffffff', '#ffd1e8'];
+    const colors = [options.color, '#ffffff', '#ffd1e8', options.color];
     const pieces = [];
     const end = performance.now() + durationMs;
 
@@ -141,51 +173,47 @@ function celebrate(hasCustomSound) {
     }, CELEBRATION_MS);
 }
 
-function formatDuration(minutes) {
-    const h = Math.floor(minutes / 60);
-    const m = Math.round(minutes % 60);
-    return h > 0 ? `${h} Std. ${m} Min.` : `${m} Min.`;
-}
-
-function formatEta(minutes) {
-    const eta = new Date(Date.now() + minutes * 60000);
-    return eta.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-}
-
 async function update() {
     try {
         const response = await fetch('/status', { cache: 'no-store' });
         const data = await response.json();
+        applyOptions(data.overlay);
 
+        // Sample data for the preview on the settings page
+        if (isDemo && !data.name && !data.designTitle) {
+            Object.assign(data, { name: 'Beispiel-Druck', progress: 64, remainingMinutes: 83, state: 'RUNNING' });
+        }
         if (isTest) {
             data.state = 'FINISH';
             data.progress = 100;
         }
 
         // Only a real switch to FINISH triggers the celebration, not reloading the page afterwards
-        if (data.state === 'FINISH' && lastState !== null && lastState !== 'FINISH') {
+        const testPressed = lastTestFinishAt !== null && data.testFinishAt !== lastTestFinishAt;
+        if ((data.state === 'FINISH' && lastState !== null && lastState !== 'FINISH') || testPressed) {
             celebrate(data.hasSound);
         }
         if (isTest && lastState === null) {
             celebrate(data.hasSound);
         }
         lastState = data.state || 'UNKNOWN';
+        lastTestFinishAt = data.testFinishAt;
 
-        const progress = Math.max(0, Math.min(100, Number(data.progress) || 0));
+        const celebrating = Date.now() < celebrateUntil;
+        const progress = celebrating ? 100 : Math.max(0, Math.min(100, Number(data.progress) || 0));
         document.getElementById('bar').style.width = `${progress}%`;
         document.getElementById('percent').textContent = `${Math.round(progress)} %`;
         const printTitle = data.designTitle || data.name || '–';
-        const celebrating = Date.now() < celebrateUntil;
         // While celebrating the big line shows "… ist fertig!" and the small line the print name
         document.getElementById('name').textContent = celebrating ? finishedText() : printTitle;
         document.getElementById('label').textContent = celebrating
             ? printTitle
-            : printerName
-                ? `${printerName} ${NAMED_STATE_LABELS[data.state] || NAMED_STATE_LABELS.RUNNING}`
+            : options.name
+                ? `${options.name} ${NAMED_STATE_LABELS[data.state] || NAMED_STATE_LABELS.RUNNING}`
                 : (STATE_LABELS[data.state] || STATE_LABELS.RUNNING);
 
         const time = document.getElementById('time');
-        if (data.state === 'FINISH') {
+        if (celebrating || data.state === 'FINISH') {
             time.textContent = 'Druck abgeschlossen';
         } else if (data.remainingMinutes !== null && data.remainingMinutes > 0) {
             time.textContent = `noch ${formatDuration(data.remainingMinutes)} · fertig ca. ${formatEta(data.remainingMinutes)} Uhr`;
@@ -194,8 +222,8 @@ async function update() {
         }
 
         const cover = document.getElementById('cover');
-        cover.hidden = !(showCover && data.hasCover);
-        if (showCover && data.hasCover && data.coverVersion !== lastCoverVersion) {
+        cover.hidden = !(options.cover && data.hasCover);
+        if (options.cover && data.hasCover && data.coverVersion !== lastCoverVersion) {
             lastCoverVersion = data.coverVersion;
             cover.src = `/cover?v=${data.coverVersion}`;
         }
@@ -205,4 +233,4 @@ async function update() {
 }
 
 update();
-setInterval(update, 2000);
+setInterval(update, isDemo ? 1000 : 2000);
