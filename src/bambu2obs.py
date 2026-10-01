@@ -13,9 +13,41 @@ import subprocess
 import signal
 import sys
 import xml.etree.ElementTree as ET
+import threading
+
+# As .exe (PyInstaller) the config and data live next to the .exe, otherwise in the project folder
+if getattr(sys, 'frozen', False):
+    APP_DIR = os.path.dirname(sys.executable)
+    TEMPLATE_DIR = os.path.join(sys._MEIPASS, 'templates')
+else:
+    APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+ENV_PATH = os.path.join(APP_DIR, '.env')
+
+def run_first_setup():
+    """Asks for the printer details on first start and writes the .env file."""
+    print("=" * 60)
+    print(" Bambu2OBS - Ersteinrichtung")
+    print(" Die Angaben findest du am Drucker unter Einstellungen -> WLAN/Netzwerk.")
+    print("=" * 60)
+    printer_ip = input("IP-Adresse des Druckers (z. B. 192.168.178.45): ").strip()
+    access_code = input("Access Code des Druckers: ").strip()
+    printer_sn = input("Seriennummer des Druckers: ").strip()
+    print("Optional: Bambu-Konto fuer Modellname und Vorschaubild (leer lassen = ohne).")
+    email = input("Bambu-Konto E-Mail: ").strip()
+    password = input("Bambu-Konto Passwort: ").strip() if email else ''
+    with open(ENV_PATH, 'w', encoding='utf-8') as env_file:
+        env_file.write(
+            f"EMAIL={email}\nPASSWORD={password}\nREGION=global\n"
+            f"PRINTER_SN={printer_sn}\nPRINTER_IP={printer_ip}\nACCESS_CODE={access_code}\nBASE_DIR=data\n"
+        )
+    print(f"Gespeichert in {ENV_PATH} - zum Aendern diese Datei loeschen und neu starten.\n")
+
+if __name__ == '__main__' and not os.path.exists(ENV_PATH):
+    run_first_setup()
 
 # Load environment variables
-load_dotenv()
+load_dotenv(ENV_PATH)
 
 # Additional global variable to track the first run
 is_first_run = True
@@ -23,12 +55,13 @@ is_first_run = True
 subprocesses = []  # List to keep track of subprocesses
 
 def launch_progress_server():
-    """Launches the progress bar server as a separate process."""
-    # Use the current Python interpreter to run progressbarServer.py
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    proc = subprocess.Popen([sys.executable, os.path.join(script_dir, 'progressbarServer.py')])
-    subprocesses.append(proc)
-    return proc
+    """Starts the overlay web server in a background thread (also works inside the .exe)."""
+    import progressbarServer
+    server_thread = threading.Thread(
+        target=lambda: progressbarServer.app.run(port=5000, use_reloader=False),
+        daemon=True,
+    )
+    server_thread.start()
 
 def cleanup_subprocesses():
     """Terminates all running subprocesses initiated by this script."""
@@ -37,7 +70,6 @@ def cleanup_subprocesses():
         proc.wait()       # Wait for the subprocess to exit
 
 # Define the path for the ConnectionDumps.json file in the data subdirectory
-DUMPS_FILE_PATH = os.path.join(os.getenv('BASE_DIR', 'data'), 'ConnectionDumps.json')
 
 # Retrieve environment variables
 REGION = os.getenv('REGION')
@@ -47,7 +79,10 @@ USERNAME = os.getenv('USERNAME')
 PRINTER_SN = os.getenv('PRINTER_SN')
 PRINTER_IP = os.getenv('PRINTER_IP')
 ACCESS_CODE = os.getenv('ACCESS_CODE')
-BASE_DIR = os.getenv('BASE_DIR', 'data')
+BASE_DIR = os.path.join(APP_DIR, os.getenv('BASE_DIR') or 'data')
+# progressbarServer reads BASE_DIR from the environment, so hand over the absolute path
+os.environ['BASE_DIR'] = BASE_DIR
+DUMPS_FILE_PATH = os.path.join(BASE_DIR, 'ConnectionDumps.json')
 DUMP_MESSAGES = os.getenv('DUMP_MESSAGES', '0') == '1'
 
 total_layer_num_global = None
@@ -207,11 +242,10 @@ def read_active_ams_tray_from_file():
     
 # Function to update the SVG with colors for all trays
 def update_svg_with_all_tray_colors():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    input_svg_path = os.path.join(script_dir, "templates", "Filaments.svg")
-    active_input_svg_path = os.path.join(script_dir, "templates", "ActiveFilament.svg")
-    output_svg_path = os.path.join(script_dir, os.pardir, "data", "Filaments.svg")
-    active_output_svg_path = os.path.join(script_dir, os.pardir, "data", "ActiveFilament.svg")
+    input_svg_path = os.path.join(TEMPLATE_DIR, "Filaments.svg")
+    active_input_svg_path = os.path.join(TEMPLATE_DIR, "ActiveFilament.svg")
+    output_svg_path = os.path.join(BASE_DIR, "Filaments.svg")
+    active_output_svg_path = os.path.join(BASE_DIR, "ActiveFilament.svg")
     
     tree = ET.parse(input_svg_path)
     active_tree = ET.parse(active_input_svg_path)
@@ -515,9 +549,13 @@ def main():
         print("Interrupt received, stopping...")
     except Exception as e:
         print(f"Unhandled exception: {e}")
+        print("Verbindung zum Drucker fehlgeschlagen - IP-Adresse und Access Code in der .env pruefen.")
     finally:
         cleanup_subprocesses()
         print("Progress bar server stopped.")
+        # Keep the .exe window open so the message can be read
+        if getattr(sys, 'frozen', False):
+            input("Enter druecken zum Beenden ...")
 
 if __name__ == "__main__":
     main()

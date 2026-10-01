@@ -11,51 +11,44 @@ Das Programm läuft auf dem PC, auf dem auch OBS läuft, und liest die Daten dir
 ## 1. Was du brauchst
 
 - Einen **Bambu Lab Drucker** (X1, P1, A1 …) im selben Netzwerk wie der PC
-- **OBS Studio**
-- **Python 3** – Download unter https://www.python.org/downloads/
-  ⚠️ Beim Installieren unbedingt das Häkchen **„Add python.exe to PATH“** setzen!
+- **OBS Studio** auf einem Windows-PC
 
-## 2. Programm herunterladen
+Python oder sonstige Programme brauchst du **nicht**.
 
-Auf dieser GitHub-Seite oben auf den grünen Button **„Code“** → **„Download ZIP“** klicken und die ZIP-Datei z. B. nach `C:\Bambu2OBS` entpacken.
+## 2. Herunterladen
 
-## 3. Einmalig einrichten
+1. Rechts auf dieser GitHub-Seite unter **„Releases“** die neueste Version öffnen.
+2. **`Bambu2OBS-Windows.zip`** herunterladen und in einen eigenen Ordner entpacken, z. B. `C:\Bambu2OBS`.
 
-1. Den Ordner `C:\Bambu2OBS` im Explorer öffnen, oben in die Adresszeile klicken, `cmd` eintippen und Enter drücken. Es öffnet sich ein schwarzes Fenster (Eingabeaufforderung) direkt in diesem Ordner.
-2. Diese Befehle nacheinander eingeben (jeweils mit Enter bestätigen):
+## 3. Erster Start
 
-   ```
-   python -m venv b2obsvenv
-   b2obsvenv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+1. **`Bambu2OBS.exe`** doppelklicken.
+   Falls Windows „Der Computer wurde durch Windows geschützt“ anzeigt: auf **„Weitere Informationen“** → **„Trotzdem ausführen“** klicken. (Das kommt bei kleinen Programmen ohne gekaufte Signatur.)
+2. Im schwarzen Fenster wirst du einmalig nach diesen Angaben gefragt:
 
-## 4. Drucker-Daten eintragen
-
-1. Die Datei `example.env` kopieren und die Kopie in **`.env`** umbenennen (ohne „example“, mit Punkt am Anfang).
-2. Die `.env` mit dem Editor öffnen und ausfüllen:
-
-   | Eintrag | Wo finde ich das? |
+   | Frage | Wo finde ich das? |
    |---|---|
-   | `PRINTER_IP` | Am Drucker-Display unter **Einstellungen → WLAN/Netzwerk** (z. B. `192.168.178.45`) |
-   | `ACCESS_CODE` | Am Drucker-Display unter **Einstellungen → WLAN/Netzwerk** („Access Code“ / „Zugangscode“) |
-   | `PRINTER_SN` | Seriennummer: am Drucker unter **Einstellungen → Gerät**, oder in Bambu Studio / Bambu Handy |
-   | `EMAIL`, `PASSWORD` | **Optional.** Bambu-Konto-Daten – damit kommen Modellname und Vorschaubild aus der Bambu Cloud. |
-   | `REGION` | `global` lassen |
-   | `BASE_DIR` | `data` lassen |
+   | IP-Adresse | Am Drucker-Display unter **Einstellungen → WLAN/Netzwerk** (z. B. `192.168.178.45`) |
+   | Access Code | Ebenfalls unter **Einstellungen → WLAN/Netzwerk** („Access Code“ / „Zugangscode“) |
+   | Seriennummer | Am Drucker unter **Einstellungen → Gerät**, oder in Bambu Studio / Bambu Handy |
+   | E-Mail / Passwort | **Optional**, einfach mit Enter überspringen. Mit Bambu-Konto werden Modellname und Vorschaubild angezeigt, ohne Konto der Dateiname des Drucks. |
 
-   **Tipp:** Wenn die Cloud-Anmeldung Probleme macht (z. B. wegen Bestätigungscode per Mail), `EMAIL` und `PASSWORD` einfach leer lassen. Dann wird statt des Modellnamens der Dateiname des Drucks angezeigt – Balken und Restzeit funktionieren trotzdem.
+   Die Angaben werden in der Datei `.env` neben der .exe gespeichert. Zum Ändern diese Datei löschen und die .exe neu starten.
 
-## 5. Starten
+## 4. Jedes Mal vor dem Streamen
 
-Jedes Mal vor dem Streamen im Ordner `C:\Bambu2OBS` eine Eingabeaufforderung öffnen (siehe Schritt 3.1) und eingeben:
+**`Bambu2OBS.exe`** starten und das schwarze Fenster offen lassen, solange das Overlay laufen soll. Zum Beenden das Fenster schließen.
+
+## 5. Alternative: mit Python starten (für Bastler)
+
+Mit installiertem Python 3 im Projektordner:
 
 ```
+python -m venv b2obsvenv
 b2obsvenv\Scripts\activate
+pip install -r requirements.txt
 python src\bambu2obs.py
 ```
-
-Das Fenster offen lassen, solange das Overlay laufen soll. Beenden mit **Strg + C**.
 
 ## 6. In OBS einbinden
 
@@ -82,6 +75,6 @@ Mehrere kombinieren mit `&`, z. B. `http://localhost:5000/view/overlay?color=c02
 
 ## 7. Wenn etwas nicht klappt
 
-- **Overlay bleibt leer / zeigt „–“:** Läuft das schwarze Fenster noch? Startet gerade ein Druck? Die Daten kommen erst, sobald der Drucker welche sendet.
-- **Keine Verbindung zum Drucker:** IP-Adresse und Access Code nochmal prüfen. Bei neueren Firmware-Versionen muss am Drucker eventuell der **LAN-Modus** bzw. **Entwicklermodus** aktiviert werden, damit externe Programme mitlesen dürfen.
-- **„python“ wird nicht gefunden:** Python wurde ohne das Häkchen „Add to PATH“ installiert → Python nochmal installieren und das Häkchen setzen.
+- **Overlay bleibt leer / zeigt „–“:** Läuft das schwarze Fenster von Bambu2OBS noch? Startet gerade ein Druck? Die Daten kommen erst, sobald der Drucker welche sendet.
+- **Keine Verbindung zum Drucker:** IP-Adresse und Access Code nochmal prüfen (`.env` löschen und neu starten). Bei neueren Firmware-Versionen muss am Drucker eventuell der **LAN-Modus** bzw. **Entwicklermodus** aktiviert werden, damit externe Programme mitlesen dürfen.
+- **Die IP-Adresse ändert sich ständig:** Im Router dem Drucker eine feste IP-Adresse geben.

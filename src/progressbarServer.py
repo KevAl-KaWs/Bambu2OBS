@@ -6,11 +6,13 @@ import time
 import logging
 from dotenv import load_dotenv
 from threading import Thread
+import sys
 
 # Load environment variables
 load_dotenv()
 
 BASE_DIR = os.path.abspath(os.getenv('BASE_DIR', 'data'))
+TEMPLATE_DIR = os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))), 'templates')
 SVG_FILES = ['Filaments.svg', 'ActiveFilament.svg']
 
 app = Flask(__name__)
@@ -90,11 +92,11 @@ def get_cover():
 
 @app.route('/view/overlay')
 def overlay_view():
-    return send_from_directory(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'), 'overlay.html')
+    return send_from_directory(TEMPLATE_DIR, 'overlay.html')
 
 @app.route('/view/overlay.js')
 def overlay_script():
-    return send_from_directory(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'), 'overlay.js')
+    return send_from_directory(TEMPLATE_DIR, 'overlay.js')
 
 @app.route('/view/progressbar')
 def progressbar_view():
