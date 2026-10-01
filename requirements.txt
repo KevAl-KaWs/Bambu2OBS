@@ -6,3 +6,5 @@ python-dateutil
 flask
 flask-cors
 packaging
+pystray
+pillow

@@ -14,6 +14,7 @@ import signal
 import sys
 import xml.etree.ElementTree as ET
 import threading
+import logging
 import webbrowser
 import shutil
 import ftplib
@@ -99,6 +100,8 @@ is_first_run = True
 def launch_progress_server():
     """Starts the overlay web server in a background thread (also works inside the .exe)."""
     import progressbarServer
+    # The overlay polls every 2 seconds - do not log every request
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
     progressbarServer.runtime['save_printer_settings'] = save_printer_settings
     progressbarServer.runtime['read_settings'] = read_settings
     globals()['server_runtime'] = progressbarServer.runtime
@@ -696,43 +699,96 @@ def wait_for_settings_change():
         pass
     settings_changed.clear()
 
-def main():
-    """
-    Starts the overlay/settings web server and keeps the printer connection
-    in sync with the settings page.
-    """
-    global previous_job_key
-    launch_progress_server()
-    print("=" * 60)
-    print(" Bambu2OBS läuft - dieses Fenster offen lassen.")
-    print(f" Einstellungen:  {SETTINGS_URL}")
-    print(" OBS-Overlay:    http://localhost:5000/view/overlay")
-    print("=" * 60)
+def connection_text():
+    """Short connection state for the tray tooltip."""
+    connection = server_runtime.get('connection', {})
+    state = connection.get('state')
+    since_ago = time.time() - connection.get('since', time.time())
+    if state == 'connected':
+        if not server_runtime.get('last_message') and since_ago > 20:
+            return 'verbunden, aber keine Daten'
+        return 'mit dem Drucker verbunden'
+    if state == 'error':
+        return connection.get('detail') or 'Verbindungsfehler'
+    if state == 'unconfigured':
+        return 'noch nicht eingerichtet'
+    return 'keine Verbindung' if since_ago > 20 else 'verbinde …'
 
-    try:
+def run_printer_loop():
+    """Keeps the printer connection in sync with the settings page."""
+    global previous_job_key
+    while True:
         if not printer_configured():
             set_connection('unconfigured')
-            print("Noch keine Drucker-Daten: Die Einstellungsseite öffnet sich im Browser.")
-            time.sleep(1)
-            webbrowser.open(SETTINGS_URL)
-
-        while True:
-            if not printer_configured():
-                set_connection('unconfigured')
-                wait_for_settings_change()
-                continue
-
-            # Process the latest task from Bambu Cloud (optional)
-            try_process_latest_task(force_update=True)
-            print(f"Connecting to printer {PRINTER_IP} ...")
-            set_connection('connecting', f'Verbinde mit {PRINTER_IP} ...')
-            previous_job_key = None
-            mqtt_client = setup_mqtt_listener()
             wait_for_settings_change()
-            print("Settings changed, reconnecting ...")
-            stop_mqtt_listener(mqtt_client)
-    except KeyboardInterrupt:
-        print("Interrupt received, stopping...")
+            continue
+
+        # Process the latest task from Bambu Cloud (optional)
+        try_process_latest_task(force_update=True)
+        print(f"Connecting to printer {PRINTER_IP} ...")
+        set_connection('connecting', f'Verbinde mit {PRINTER_IP} ...')
+        previous_job_key = None
+        mqtt_client = setup_mqtt_listener()
+        wait_for_settings_change()
+        print("Settings changed, reconnecting ...")
+        stop_mqtt_listener(mqtt_client)
+
+def redirect_output_to_log():
+    """The .exe has no console window, so output goes to a log file in the settings folder."""
+    if sys.stdout is not None and not getattr(sys, 'frozen', False):
+        return
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    log_path = os.path.join(CONFIG_DIR, 'bambu2obs.log')
+    if os.path.exists(log_path) and os.path.getsize(log_path) > 1024 * 1024:
+        os.remove(log_path)
+    log_file = open(log_path, 'a', encoding='utf-8', buffering=1)
+    sys.stdout = sys.stderr = log_file
+    print(f"\n--- Bambu2OBS gestartet {datetime.now():%d.%m.%Y %H:%M:%S} ---")
+
+def already_running():
+    """True if another Bambu2OBS already serves on port 5000."""
+    try:
+        response = requests.get('http://127.0.0.1:5000/status', timeout=1.5)
+        return 'overlay' in response.json()
+    except Exception:
+        return False
+
+def main():
+    """
+    Starts the overlay/settings web server, the printer connection and the tray icon.
+    """
+    redirect_output_to_log()
+    if already_running():
+        # Started a second time: just show the settings of the running one
+        webbrowser.open(SETTINGS_URL)
+        return
+
+    launch_progress_server()
+    print(f"Einstellungen: {SETTINGS_URL}")
+    print("OBS-Overlay:   http://localhost:5000/view/overlay")
+
+    if not printer_configured():
+        set_connection('unconfigured')
+        print("Noch keine Drucker-Daten: Die Einstellungsseite öffnet sich im Browser.")
+        threading.Timer(1.5, webbrowser.open, args=(SETTINGS_URL,)).start()
+
+    threading.Thread(target=run_printer_loop, daemon=True).start()
+
+    from tray import run_tray
+    tray_shown = run_tray(
+        get_status_text=connection_text,
+        open_settings=lambda: webbrowser.open(SETTINGS_URL),
+        overlay_url='http://localhost:5000/view/overlay',
+        on_quit=lambda: os._exit(0),
+    )
+    if not tray_shown:
+        # No tray (e.g. started from source on Linux): keep running until Ctrl+C
+        print("Bambu2OBS läuft - zum Beenden Strg+C drücken.")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("Interrupt received, stopping...")
 
 if __name__ == "__main__":
     main()

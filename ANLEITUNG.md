@@ -24,7 +24,7 @@ Python oder sonstige Programme brauchst du **nicht**.
 
 1. **`Bambu2OBS.exe`** doppelklicken.
    Falls Windows „Der Computer wurde durch Windows geschützt“ anzeigt: auf **„Weitere Informationen“** → **„Trotzdem ausführen“** klicken. (Das kommt bei kleinen Programmen ohne gekaufte Signatur.)
-2. Es öffnet sich ein schwarzes Fenster – und im Browser automatisch die **Einstellungsseite**.
+2. Im Browser öffnet sich automatisch die **Einstellungsseite**. Bambu2OBS selbst hat kein Fenster, sondern läuft als **pinkes Symbol unten rechts in der Taskleiste** (neben der Uhr).
 3. Dort **IP-Adresse**, **Access Code** und **Seriennummer** eintragen und auf **„Speichern & verbinden“** klicken. Wo du die Angaben findest, steht im nächsten Abschnitt (und auf der Seite unter „Wo finde ich das?“).
 4. Oben rechts erscheint **„Mit dem Drucker verbunden“** – fertig.
 
@@ -52,7 +52,15 @@ Den Access Code am besten direkt beim ersten Start vom Display ablesen. Er kann 
 
 ## 4. Jedes Mal vor dem Streamen
 
-**`Bambu2OBS.exe`** starten und das schwarze Fenster offen lassen, solange das Overlay laufen soll. Zum Beenden das Fenster schließen. Die Einstellungsseite brauchst du dafür nicht – die kannst du zumachen.
+**`Bambu2OBS.exe`** starten – mehr nicht. Es erscheint kurz die Meldung „Bambu2OBS läuft“ und unten rechts in der Taskleiste das pinke Symbol:
+
+- **Doppelklick** auf das Symbol öffnet die Einstellungen.
+- **Rechtsklick** zeigt das Menü: *Einstellungen öffnen*, *Overlay-Adresse kopieren*, *Beenden*.
+- **Mit der Maus drüberfahren** zeigt, ob der Drucker verbunden ist.
+
+Siehst du das Symbol nicht? Windows versteckt neue Symbole gern hinter dem kleinen Pfeil **^** neben der Uhr. Von dort kannst du es mit der Maus in die Taskleiste ziehen, dann ist es immer sichtbar.
+
+Wird die .exe aus Versehen ein zweites Mal gestartet, öffnet sich einfach die Einstellungsseite – es läuft trotzdem nur einmal.
 
 ## 5. Alternative: mit Python starten (für Bastler)
 
@@ -100,7 +108,7 @@ An die OBS-Adresse angehängt, haben diese Werte Vorrang vor der Einstellungssei
 
 ## 7. Auf eine neue Version updaten
 
-1. Bambu2OBS schließen (das schwarze Fenster).
+1. Bambu2OBS beenden: Rechtsklick auf das pinke Symbol in der Taskleiste → **Beenden**.
 2. Unter **„Releases“** auf dieser GitHub-Seite die neueste `Bambu2OBS-Windows-….zip` herunterladen.
 3. Die neue **`Bambu2OBS.exe`** über die alte kopieren, oder einfach woanders entpacken – egal wohin.
 4. Bambu2OBS starten. Deine Einstellungen und ein eigener Sound sind gespeichert, du musst nichts neu eingeben. Auch in OBS bleibt alles, wie es ist. Falls das Overlay in OBS noch alt aussieht: Browserquelle anklicken → **„Seite aktualisieren“** bzw. in den Eigenschaften „Cache der aktuellen Seite aktualisieren“.
@@ -109,8 +117,9 @@ Die Versionsnummer steht im Namen der ZIP-Datei, z. B. `Bambu2OBS-Windows-v1.2.0
 
 ## 8. Wenn etwas nicht klappt
 
-- **Einstellungsseite geht nicht auf:** Läuft das schwarze Fenster? Dann im Browser **http://localhost:5000** eintippen.
-- **Overlay bleibt leer / zeigt „–“:** Läuft das schwarze Fenster von Bambu2OBS noch? Startet gerade ein Druck? Die Daten kommen erst, sobald der Drucker welche sendet.
+- **Einstellungsseite geht nicht auf:** Ist das pinke Symbol in der Taskleiste da (evtl. hinter dem Pfeil **^**)? Dann im Browser **http://localhost:5000** eintippen. Wenn nicht: die .exe nochmal starten.
+- **Overlay bleibt leer / zeigt „–“:** Läuft Bambu2OBS noch (pinkes Symbol in der Taskleiste)? Startet gerade ein Druck? Die Daten kommen erst, sobald der Drucker welche sendet.
 - **Keine Verbindung zum Drucker:** Auf der Einstellungsseite (http://localhost:5000) steht oben rechts, was los ist. IP-Adresse und Access Code nochmal prüfen und speichern. Bei neueren Firmware-Versionen muss am Drucker eventuell der **LAN-Modus** bzw. **Entwicklermodus** aktiviert werden, damit externe Programme mitlesen dürfen.
 - **Kein Vorschaubild:** Das Bild wird bei jedem neuen Druck von der **SD-Karte im Drucker** geholt. Ohne SD-Karte geht das nicht. Bei einem Druck, der schon lief, bevor Bambu2OBS gestartet wurde, kann es ein paar Sekunden dauern.
 - **Overlay ging, nach ein paar Tagen aber nicht mehr:** Der Router hat dem Drucker vermutlich eine neue IP-Adresse gegeben. Im Router eine feste Adresse einstellen (FritzBox: **Heimnetz → Netzwerk** → beim Drucker auf den Stift klicken → **„Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“**). Danach auf der Einstellungsseite die neue IP-Adresse eintragen und speichern.
+- **Für die Fehlersuche:** Bambu2OBS schreibt ein Protokoll nach `%APPDATA%\Bambu2OBS\bambu2obs.log` (Windows-Taste + R, `%APPDATA%\Bambu2OBS` eingeben, Enter).
