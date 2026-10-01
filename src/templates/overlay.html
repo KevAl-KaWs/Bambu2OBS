@@ -17,7 +17,7 @@
             padding: 0;
             background: transparent;
             overflow: hidden;
-            font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+            font-family: "Segoe UI", system-ui, -apple-system, sans-serif, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji";
             color: var(--text);
         }
         .card {
@@ -79,6 +79,40 @@
         }
         .percent { font-weight: 700; color: var(--bar-light); }
         .time { color: var(--muted); text-align: right; }
+
+        /* Finish celebration */
+        .card { position: relative; transition: box-shadow 0.4s ease; }
+        #confetti {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+        }
+        body.celebrate .card {
+            animation: card-glow 1.2s ease-in-out infinite alternate;
+        }
+        body.celebrate .name {
+            animation: pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+        }
+        body.celebrate .bar {
+            background: linear-gradient(90deg, var(--bar), var(--bar-light), #ffffff, var(--bar-light), var(--bar));
+            background-size: 300% 100%;
+            animation: shimmer 1.6s linear infinite;
+        }
+        body.celebrate .label { color: var(--bar-light); font-weight: 700; }
+        @keyframes card-glow {
+            from { box-shadow: inset 0 0 0 2px var(--bar), inset 0 0 10px var(--bar); }
+            to   { box-shadow: inset 0 0 0 3px var(--bar-light), inset 0 0 26px var(--bar); }
+        }
+        @keyframes pop {
+            from { transform: scale(0.6); opacity: 0; }
+            to   { transform: scale(1); opacity: 1; }
+        }
+        @keyframes shimmer {
+            from { background-position: 100% 0; }
+            to   { background-position: -200% 0; }
+        }
     </style>
 </head>
 <body>
@@ -94,6 +128,7 @@
             </div>
         </div>
     </div>
+    <canvas id="confetti"></canvas>
     <script src="/view/overlay.js"></script>
 </body>
 </html>

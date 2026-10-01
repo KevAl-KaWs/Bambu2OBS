@@ -12,6 +12,9 @@ import sys
 load_dotenv()
 
 BASE_DIR = os.path.abspath(os.getenv('BASE_DIR', 'data'))
+# Folder of the .exe / project, where a custom finish sound (fertig.mp3 etc.) can be placed
+APP_DIR = os.path.abspath(os.getenv('APP_DIR', os.path.dirname(BASE_DIR)))
+SOUND_FILES = ['fertig.mp3', 'fertig.wav', 'fertig.ogg']
 TEMPLATE_DIR = os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))), 'templates')
 SVG_FILES = ['Filaments.svg', 'ActiveFilament.svg']
 
@@ -82,7 +85,21 @@ def get_status():
         'totalLayers': read_data('total_layer_num'),
         'hasCover': os.path.exists(cover_path),
         'coverVersion': int(os.path.getmtime(cover_path)) if os.path.exists(cover_path) else 0,
+        'hasSound': find_sound_file() is not None,
     })
+
+def find_sound_file():
+    for name in SOUND_FILES:
+        if os.path.exists(os.path.join(APP_DIR, name)):
+            return name
+    return None
+
+@app.route('/sound')
+def get_sound():
+    sound_file = find_sound_file()
+    if sound_file:
+        return send_from_directory(APP_DIR, sound_file)
+    return "No sound", 404
 
 @app.route('/cover')
 def get_cover():

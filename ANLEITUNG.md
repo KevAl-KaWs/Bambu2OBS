@@ -88,10 +88,21 @@ Einfach an die URL anhängen:
 | `?color=ff4fa3` | Farbe des Balkens (Hex-Farbcode ohne `#`), Standard ist Pink |
 | `?card=0` | Ohne dunklen Hintergrund-Kasten |
 | `?cover=0` | Ohne Vorschaubild |
+| `?sound=0` | Kein Sound bei „fertig“ |
+| `?volume=40` | Lautstärke des Fertig-Sounds von 0 bis 100 (Standard 70) |
+| `?test=fertig` | Zeigt sofort die Fertig-Einblendung, zum Ausprobieren. Danach wieder entfernen! |
 
 Mehrere kombinieren mit `&`, z. B. `http://localhost:5000/view/overlay?name=Printcess&color=c026d3`
 
 Die URL änderst du in OBS mit einem Doppelklick auf die Browserquelle.
+
+### Fertig-Einblendung mit Sound
+
+Sobald der Drucker fertig ist, gibt es pinkes Konfetti, der Kasten leuchtet, dort steht z. B. „Printcess ist fertig! 🎉“ und es ertönt ein kurzer Glockenklang.
+
+- **Eigener Sound:** Eine Datei **`fertig.mp3`** (oder `fertig.wav` / `fertig.ogg`) in den Ordner neben die `Bambu2OBS.exe` legen, dann wird stattdessen die abgespielt.
+- **Damit die Zuschauer den Sound hören:** In den Eigenschaften der Browserquelle das Häkchen **„Audio über OBS steuern“** setzen. Der Sound erscheint dann im Audio-Mixer als eigene Spur und geht mit in den Stream. Wenn du ihn selbst auch hören willst: im Mixer bei der Quelle auf ⚙️ → **Erweiterte Audioeigenschaften** → Audioüberwachung **„Überwachen und ausgeben“**.
+- **Ausprobieren:** `&test=fertig` an die URL hängen, dann kommt die Einblendung sofort. Danach wieder entfernen.
 
 ## 7. Auf eine neue Version updaten
 

@@ -86,6 +86,7 @@ ACCESS_CODE = os.getenv('ACCESS_CODE')
 BASE_DIR = os.path.join(APP_DIR, os.getenv('BASE_DIR') or 'data')
 # progressbarServer reads BASE_DIR from the environment, so hand over the absolute path
 os.environ['BASE_DIR'] = BASE_DIR
+os.environ['APP_DIR'] = APP_DIR
 DUMPS_FILE_PATH = os.path.join(BASE_DIR, 'ConnectionDumps.json')
 DUMP_MESSAGES = os.getenv('DUMP_MESSAGES', '0') == '1'
 
